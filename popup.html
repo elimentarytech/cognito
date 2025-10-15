@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stickr</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 16px;
+      background: #f8f9fa;
+    }
+
+    .header {
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 18px;
+      color: #212529;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #6c757d;
+    }
+
+    .stats {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #495057;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0d6efd;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      text-decoration: none;
+      color: white;
+    }
+
+    .btn-primary {
+      background: #0d6efd;
+    }
+
+    .btn-primary:hover {
+      background: #0b5ed7;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+    }
+
+    .btn-secondary:hover {
+      background: #5c636a;
+    }
+
+    .status {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #495057;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #198754;
+    }
+
+    .status-dot.inactive {
+      background: #dc3545;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #dee2e6;
+      text-align: center;
+      font-size: 12px;
+      color: #6c757d;
+    }
+
+    .footer a {
+      color: #0d6efd;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📍 Stickr</h1>
+    <p class="subtitle">Add comments to your dashboards</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat-row">
+      <span class="stat-label">Total Comments</span>
+      <span class="stat-value" id="total-comments">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Bubble Comments</span>
+      <span class="stat-value" id="bubble-comments">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Page Notes</span>
+      <span class="stat-value" id="page-notes">0</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="toggle-sidebar">Open Sidebar</button>
+    <button class="btn btn-secondary" id="export-data">Export Comments</button>
+  </div>
+
+  <div class="status">
+    <div class="status-indicator">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Extension Active</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Supports Power BI, Tableau & more</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
