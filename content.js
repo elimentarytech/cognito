@@ -452,7 +452,7 @@ class Stickr {
                 🔍 Test
               </button>
               <button class="dc-btn dc-btn-primary" id="dc-db-save" style="flex: 1; padding: 0.5rem; font-size: 13px;" disabled>
-                ✅ Save
+                Save
               </button>
             </div>
           </div>
@@ -462,8 +462,10 @@ class Stickr {
         
         // Local Storage option click handler
         const localStorageOption = document.getElementById('dc-local-storage-option');
-        localStorageOption.addEventListener('click', () => {
+        localStorageOption.addEventListener('click', async () => {
           console.log('💾 User selected Local Storage (Solo Mode)');
+          // Save the choice to prevent showing dialog again
+          await chrome.storage.sync.set({ dbProvider: 'local' });
           dialog.remove();
           resolve();
         });
@@ -478,7 +480,10 @@ class Stickr {
         let connectionValid = false;
         
         // Cancel button
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', async () => {
+          console.log('User cancelled database configuration');
+          // Save local storage as default to prevent showing dialog again
+          await chrome.storage.sync.set({ dbProvider: 'local' });
           dialog.remove();
           resolve();
         });
@@ -508,7 +513,7 @@ class Stickr {
             // Reset validation state
             connectionValid = false;
             saveBtn.disabled = true;
-            testBtn.textContent = '🔍 Test Connection';
+            testBtn.textContent = 'Test Connection';
             testBtn.style.background = '';
             testBtn.disabled = false;
             
@@ -630,7 +635,10 @@ class Stickr {
         dialog.innerHTML = `
           <div class="dc-dialog" style="max-width: 550px; max-height: 80vh; display: flex; flex-direction: column;">
             <div class="dc-dialog-header" style="padding: 1rem 1.25rem 0.75rem;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1F2937;">🎫 Jira Integration</h3>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1F2937; display: flex; align-items: center; gap: 0.5rem;">
+                <img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Atlassian" style="width: 20px; height: 20px;">
+                Atlassian Integration
+              </h3>
               <p style="margin: 0.5rem 0 0; color: #6B7280; font-size: 12px; line-height: 1.4;">
                 Connect your Jira account to create and attach tickets
               </p>
@@ -696,7 +704,7 @@ class Stickr {
                 🔍 Test
               </button>
               <button class="dc-btn dc-btn-primary" id="dc-jira-save" style="flex: 1; padding: 0.5rem; font-size: 13px;" disabled>
-                ✅ Save
+                Save
               </button>
             </div>
           </div>
@@ -878,7 +886,7 @@ class Stickr {
                 🔍 Test
               </button>
               <button class="dc-btn dc-btn-primary" id="dc-ai-save" style="flex: 1; padding: 0.5rem; font-size: 13px;" disabled>
-                ✅ Save
+                Save
               </button>
             </div>
           </div>
@@ -1415,7 +1423,7 @@ class Stickr {
               <button class="dc-btn dc-btn-primary" id="dc-add-bubble" title="Add context to the current chart">
                 📍
             </button>
-              <button class="dc-btn dc-btn-secondary" id="dc-clear-all" title="Clear all notes for this page">
+              <button class="dc-btn dc-btn-secondary" id="dc-clear-all" title="Clear all the context for this page">
                 🗑️
             </button>
           </div>
@@ -2229,7 +2237,7 @@ class Stickr {
               ${filterBadge}
           <div class="dc-comment-text">${this.escapeHtml(comment.text)}</div>
           ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-comment-link" target="_blank">🔗 View Reference</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank">🎫 ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 14px; height: 14px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
               ${comment.jiraTicket ? console.log('🔍 Rendering Jira ticket for comment:', comment.id, 'jiraTicket:', comment.jiraTicket, 'url:', comment.jiraTicket.url, 'key:', comment.jiraTicket.key) : ''}
           <div class="dc-comment-footer">
             <span class="dc-comment-author">👤 ${this.escapeHtml(comment.author)}</span>
@@ -2237,7 +2245,7 @@ class Stickr {
             </div>
             <div class="dc-comment-actions">
               <button class="dc-btn-icon dc-reply" data-id="${comment.id}" title="Reply">💬</button>
-              ${this.jira.isConfigured && !comment.jiraTicket ? `<button class="dc-btn-icon dc-create-jira" data-id="${comment.id}" title="Create Jira Ticket">🎫</button>` : ''}
+              ${this.jira.isConfigured && !comment.jiraTicket ? `<button class="dc-btn-icon dc-create-jira" data-id="${comment.id}" title="Create Jira Ticket"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 16px; height: 16px;"></button>` : ''}
               ${this.ai.isConfigured && isBubble ? `<button class="dc-btn-icon dc-ai-analyze" data-id="${comment.id}" title="AI Analyze Chart">✨</button>` : ''}
             <button class="dc-btn-icon dc-delete" data-id="${comment.id}" title="Delete">🗑️</button>
           </div>
@@ -2251,7 +2259,9 @@ class Stickr {
       // Reply buttons
       container.querySelectorAll('.dc-reply').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.currentTarget.getAttribute('data-id');
           this.showReplyDialog(id);
         });
       });
@@ -2259,7 +2269,9 @@ class Stickr {
       // Delete buttons
       container.querySelectorAll('.dc-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.currentTarget.getAttribute('data-id');
           this.deleteComment(id);
         });
       });
@@ -2267,7 +2279,9 @@ class Stickr {
       // Create Jira Ticket buttons
       container.querySelectorAll('.dc-create-jira').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.currentTarget.getAttribute('data-id');
           this.showJiraTicketDialog(id);
         });
       });
@@ -2275,7 +2289,9 @@ class Stickr {
       // AI Analyze buttons (in sidebar comments)
       container.querySelectorAll('.dc-ai-analyze').forEach(btn => {
         btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
+          e.preventDefault();
+          e.stopPropagation();
+          const id = e.currentTarget.getAttribute('data-id');
           this.analyzeCommentWithAI(id);
         });
       });
@@ -2527,7 +2543,7 @@ class Stickr {
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank">🎫 ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -2641,7 +2657,7 @@ class Stickr {
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank">🎫 ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -2849,7 +2865,19 @@ class Stickr {
     }
     
     // Show configuration menu
-    showConfigMenu() {
+    async showConfigMenu() {
+      const result = await chrome.storage.sync.get('dbProvider');
+      const dbProvider = result.dbProvider || 'none';
+      let dbStatusText = 'Configure team collaboration database';
+      
+      if (dbProvider === 'local') {
+        dbStatusText = 'Currently using local storage (solo mode)';
+      } else if (dbProvider === 'supabase') {
+        dbStatusText = 'Currently using Supabase';
+      } else if (dbProvider === 'mongodb') {
+        dbStatusText = 'Currently using MongoDB';
+      }
+      
       const menu = document.createElement('div');
       menu.className = 'dc-config-menu-overlay';
       menu.innerHTML = `
@@ -2863,15 +2891,17 @@ class Stickr {
               <div class="dc-config-menu-icon">🗄️</div>
               <div class="dc-config-menu-text">
                 <div class="dc-config-menu-title">Database Configuration</div>
-                <div class="dc-config-menu-desc">Configure team collaboration database</div>
+                <div class="dc-config-menu-desc">${dbStatusText}</div>
               </div>
-              <div class="dc-config-menu-status">${this.db.isConfigured ? '✅' : '⚙️'}</div>
+              <div class="dc-config-menu-status">${this.db.isConfigured ? '✅' : (dbProvider === 'local' ? '💾' : '⚙️')}</div>
             </button>
             
             <button class="dc-config-menu-item" id="dc-menu-jira">
-              <div class="dc-config-menu-icon">🎫</div>
+              <div class="dc-config-menu-icon">
+                <img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Atlassian" style="width: 24px; height: 24px;">
+              </div>
               <div class="dc-config-menu-text">
-                <div class="dc-config-menu-title">Jira Integration</div>
+                <div class="dc-config-menu-title">Atlassian Integration</div>
                 <div class="dc-config-menu-desc">Connect to Jira for ticket management</div>
               </div>
               <div class="dc-config-menu-status">${this.jira.isConfigured ? '✅' : '⚙️'}</div>
@@ -3014,7 +3044,10 @@ class Stickr {
       dialog.innerHTML = `
         <div class="dc-dialog" style="max-width: 600px;">
           <div class="dc-dialog-header">
-            <h3>🎫 Jira Integration</h3>
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+              <img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Atlassian" style="width: 20px; height: 20px;">
+              Atlassian Integration
+            </h3>
           </div>
           <div class="dc-dialog-body" style="max-height: 70vh; overflow-y: auto;">
             <div class="dc-tab-container">
@@ -3115,8 +3148,9 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
             <button class="dc-btn dc-btn-secondary" id="dc-jira-cancel" style="flex: 1;">
               Cancel
             </button>
-            <button class="dc-btn dc-btn-primary" id="dc-jira-create" style="flex: 1;">
-              🎫 Create Ticket
+            <button class="dc-btn dc-btn-primary" id="dc-jira-create" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+              <img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 16px; height: 16px;">
+              Create Ticket
             </button>
           </div>
         </div>
@@ -3146,9 +3180,9 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
           // Update button text
           const createBtn = document.getElementById('dc-jira-create');
           if (tab === 'create') {
-            createBtn.textContent = '🎫 Create Ticket';
+            createBtn.innerHTML = `Create Ticket`;
           } else {
-            createBtn.textContent = '🔗 Attach Ticket';
+            createBtn.innerHTML = `Attach Ticket`;
           }
         });
       });
@@ -3381,7 +3415,7 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
         errorMsg.textContent = `❌ ${error.message}`;
         errorMsg.style.display = 'block';
         successMsg.style.display = 'none';
-        createBtn.textContent = '🎫 Create Ticket';
+        createBtn.innerHTML = `Create Ticket`;
         createBtn.disabled = false;
       }
     }

@@ -352,6 +352,10 @@ body {
     justify-content: center;
   }
   
+  .dc-btn-icon img {
+    pointer-events: none;
+  }
+  
   .dc-btn-icon:hover {
     opacity: 1;
   }
@@ -386,6 +390,7 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
+    overflow: hidden;
   }
   
   /* Bubble comment - Amber/Orange tint */
@@ -461,6 +466,8 @@ body {
   .dc-comment-content {
     flex: 1;
     min-width: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .dc-comment-header {
@@ -496,6 +503,9 @@ body {
     background: rgba(160, 210, 235, 0.1);
     border-radius: 0.25rem;
     display: inline-block;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
   
   .dc-filter-badge {
@@ -508,6 +518,9 @@ body {
     border-radius: 0.25rem;
     display: inline-block;
     border: 1px solid rgba(124, 58, 237, 0.2);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
   
   .dc-comment-text {
@@ -516,6 +529,9 @@ body {
     line-height: 1.5;
     margin-bottom: 0.5rem;
     white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
     font-family: var(--stickr-font-family);
   }
   
@@ -529,6 +545,9 @@ body {
     padding: 0.25rem 0.5rem;
     background: rgba(160, 210, 235, 0.1);
     border-radius: 0.25rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
   }
   
   .dc-comment-link:hover {
@@ -1715,6 +1734,9 @@ input:checked + .dc-slider:hover {
   font-weight: 500;
   margin-top: 0.5rem;
   transition: all 0.2s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .dc-jira-link:hover {

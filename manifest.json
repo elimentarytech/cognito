@@ -53,7 +53,7 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["sidebar.html", "/icons/cognito-16.png"],
+        "resources": ["sidebar.html", "/icons/cognito-16.png", "icons/atlassian.png"],
         "matches": ["<all_urls>"]
       }
     ]
