@@ -189,24 +189,27 @@ class Stickr {
         dialog.style.zIndex = '10000000';
         
         dialog.innerHTML = `
-          <div class="dc-dialog" style="max-width: 400px;">
-            <div class="dc-dialog-header">
-              <h3>🎉 Welcome to Stickr AI!</h3>
+          <div class="dc-dialog" style="max-width: 600px;">
+            <div class="dc-dialog-header" style="display: flex; justify-content: center; align-items: center; position: relative; border-bottom: none; padding-bottom: 0.5rem;">
+              <h3 style="font-size: 24px; font-weight: 700; color: #1F2937; text-align: center; margin: 0;">Cognito AI - Intelligence made Elementary</h3>
+              <button class="dc-dialog-close" id="dc-email-close" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%);">×</button>
             </div>
             <div class="dc-dialog-body">
-              <p style="margin-bottom: 1rem; color: #666;">Enter your email to get started with collaborative dashboard annotations.</p>
+              <p style="margin-bottom: 1.5rem; font-size: 16px; font-weight: 500; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                ⚡ Supercharge Your Dashboards with AI-Powered Insights
+              </p>
               <input 
                 type="email" 
                 id="dc-email-input" 
                 class="dc-comment-input" 
                 placeholder="your.email@company.com"
-                style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;"
+                style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; min-height: auto; height: auto;"
               >
               <p id="dc-email-error" style="color: #EF4444; font-size: 12px; margin-top: 0.5rem; display: none;">Please enter a valid email address</p>
             </div>
-            <div class="dc-dialog-footer">
-              <button class="dc-btn dc-btn-primary" id="dc-email-submit" style="width: 100%;">
-                ✅ Get Started
+            <div class="dc-dialog-footer" style="padding-top: 1rem;">
+              <button class="dc-btn dc-btn-primary" id="dc-email-submit" style="width: 100%; padding: 0.65rem 1.5rem; font-size: 15px;">
+                Get Started
               </button>
             </div>
           </div>
@@ -217,6 +220,13 @@ class Stickr {
         const emailInput = document.getElementById('dc-email-input');
         const errorMsg = document.getElementById('dc-email-error');
         const submitBtn = document.getElementById('dc-email-submit');
+        const closeBtn = document.getElementById('dc-email-close');
+        
+        // Close button handler
+        closeBtn.addEventListener('click', () => {
+          dialog.remove();
+          // Don't resolve or reject - just exit the flow completely
+        });
         
         emailInput.focus();
         
@@ -275,18 +285,25 @@ class Stickr {
         dialog.style.zIndex = '10000000';
         
         dialog.innerHTML = `
-          <div class="dc-dialog" style="max-width: 650px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="dc-dialog-header">
-              <h3>🗄️ Database Configuration</h3>
-            </div>
-            <div class="dc-dialog-body" style="max-height: calc(90vh - 130px); overflow-y: auto; padding: 1.25rem;">
-              <p style="margin-bottom: 1rem; color: #666; font-size: 13px; text-align: center;">
-                Choose your database provider for team collaboration<br>
-                <strong>Skip to use local storage only (solo mode)</strong>
+          <div class="dc-dialog" style="max-width: 550px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="dc-dialog-header" style="padding: 1rem 1.25rem 0.75rem;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1F2937;">🗄️ Database Configuration</h3>
+              <p style="margin: 0.5rem 0 0; color: #6B7280; font-size: 12px; line-height: 1.4;">
+                Choose your database provider for team collaboration
               </p>
+            </div>
+            <div class="dc-dialog-body" style="max-height: calc(80vh - 130px); overflow-y: auto; padding: 0 1.25rem;">
               
               <!-- Radio Button Provider Selection -->
-              <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; justify-content: center;">
+              <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center;">
+                <div id="dc-local-storage-option" class="db-provider-radio" style="cursor: pointer;">
+                  <div class="db-provider-card">
+                    <div class="db-provider-icon">💾</div>
+                    <div class="db-provider-name">Local Storage</div>
+                    <div class="db-provider-tag">Solo Mode</div>
+                  </div>
+                </div>
+                
                 <label class="db-provider-radio">
                   <input type="radio" name="db-provider" value="supabase" style="display: none;">
                   <div class="db-provider-card">
@@ -310,14 +327,14 @@ class Stickr {
               <div id="form-supabase" class="db-form" style="display: none;">
                 <div class="db-setup-guide">
                   <div class="db-setup-guide-title">📚 Supabase Setup Steps:</div>
-                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6;">
+                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6; font-size: 12px;">
                     <li>Go to <a href="https://supabase.com" target="_blank" style="color: #0066cc; font-weight: 500;">supabase.com</a> and create a free account</li>
                     <li>Click <strong>"New Project"</strong> and fill in project details</li>
                     <li>Once created, go to <strong>Settings → API</strong></li>
                     <li>Copy the <strong>"Project URL"</strong> (looks like https://xxxxx.supabase.co)</li>
                     <li>Copy the <strong>"anon public"</strong> API key</li>
                     <li>Go to <strong>SQL Editor</strong> and run this SQL:
-                      <pre style="background: #FEFCE8; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; font-size: 10px; overflow-x: auto; line-height: 1.3; border: 1px solid #FDE68A;">CREATE TABLE stickr_comments (
+                      <pre style="background: #FEF3C7; padding: 0.75rem; margin-top: 0.75rem; border-radius: 6px; font-size: 12px; overflow-x: auto; line-height: 1.5; border: 2px solid #F59E0B; font-family: 'Monaco', 'Courier New', monospace; color: #92400E; display: block;">CREATE TABLE cognito_comments (
   id TEXT PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -366,13 +383,13 @@ class Stickr {
               <div id="form-mongodb" class="db-form" style="display: none;">
                 <div class="db-setup-guide">
                   <div class="db-setup-guide-title">📚 MongoDB Atlas Setup Steps:</div>
-                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6;">
+                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6; font-size: 12px;">
                     <li>Go to <a href="https://www.mongodb.com/cloud/atlas/register" target="_blank" style="color: #0066cc; font-weight: 500;">mongodb.com/cloud/atlas</a> and create a free account</li>
                     <li>Create a <strong>free M0 cluster</strong> (Shared tier)</li>
                     <li>Set up database access: <strong>Security → Database Access → Add New User</strong></li>
                     <li>Set up network access: <strong>Security → Network Access → Add IP Address → Allow Access from Anywhere (0.0.0.0/0)</strong></li>
                     <li>Enable Data API:
-                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem;">
+                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem; font-size: 12px;">
                         <li>Go to <strong>Data API</strong> in left sidebar</li>
                         <li>Click <strong>"Enable the Data API"</strong></li>
                         <li>Copy the <strong>"URL Endpoint"</strong></li>
@@ -380,10 +397,10 @@ class Stickr {
                       </ul>
                     </li>
                     <li>Create database and collection:
-                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem;">
+                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem; font-size: 12px;">
                         <li>Go to <strong>Database → Browse Collections</strong></li>
                         <li>Click <strong>"Add My Own Data"</strong></li>
-                        <li>Database Name: <code style="background: #FEFCE8; padding: 0.125rem 0.25rem; border-radius: 3px;">stickr</code></li>
+                        <li>Database Name: <code style="background: #FEFCE8; padding: 0.125rem 0.25rem; border-radius: 3px;">cognito</code></li>
                         <li>Collection Name: <code style="background: #FEFCE8; padding: 0.125rem 0.25rem; border-radius: 3px;">comments</code></li>
                       </ul>
                     </li>
@@ -417,8 +434,8 @@ class Stickr {
                     type="text" 
                     id="dc-mongodb-database" 
                     class="db-form-input" 
-                    placeholder="stickr"
-                    value="stickr"
+                    placeholder="cognito"
+                    value="cognito"
                   >
                 </div>
                 
@@ -427,15 +444,15 @@ class Stickr {
               </div>
               
             </div>
-            <div class="dc-dialog-footer" style="display: flex; gap: 0.5rem;">
-              <button class="dc-btn dc-btn-secondary" id="dc-db-skip" style="flex: 1;">
-                ⏭️ Skip for Now
+            <div class="dc-dialog-footer" style="display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem; border-top: 1px solid #F3F4F6;">
+              <button class="dc-btn dc-btn-secondary" id="dc-db-cancel" style="flex: 1; padding: 0.5rem; font-size: 13px;">
+                Cancel
               </button>
-              <button class="dc-btn dc-btn-primary" id="dc-db-test" style="flex: 1;">
-                🔍 Test Connection
+              <button class="dc-btn dc-btn-primary" id="dc-db-test" style="flex: 1; padding: 0.5rem; font-size: 13px;">
+                🔍 Test
               </button>
-              <button class="dc-btn dc-btn-primary" id="dc-db-save" style="flex: 1;" disabled>
-                ✅ Save & Continue
+              <button class="dc-btn dc-btn-primary" id="dc-db-save" style="flex: 1; padding: 0.5rem; font-size: 13px;" disabled>
+                ✅ Save
               </button>
             </div>
           </div>
@@ -443,14 +460,28 @@ class Stickr {
         
         document.body.appendChild(dialog);
         
+        // Local Storage option click handler
+        const localStorageOption = document.getElementById('dc-local-storage-option');
+        localStorageOption.addEventListener('click', () => {
+          console.log('💾 User selected Local Storage (Solo Mode)');
+          dialog.remove();
+          resolve();
+        });
+        
         // Provider selection handling
         const providerRadios = dialog.querySelectorAll('input[name="db-provider"]');
-        const skipBtn = document.getElementById('dc-db-skip');
+        const cancelBtn = document.getElementById('dc-db-cancel');
         const testBtn = document.getElementById('dc-db-test');
         const saveBtn = document.getElementById('dc-db-save');
         
         let selectedProvider = 'supabase'; // Default to Supabase
         let connectionValid = false;
+        
+        // Cancel button
+        cancelBtn.addEventListener('click', () => {
+          dialog.remove();
+          resolve();
+        });
         
         // Select Supabase by default and show its form
         const supabaseRadio = dialog.querySelector('input[value="supabase"]');
@@ -494,13 +525,6 @@ class Stickr {
               document.getElementById('dc-mongodb-url').focus();
             }
           });
-        });
-        
-        // Skip button
-        skipBtn.addEventListener('click', () => {
-          console.log('⏭️ User skipped database configuration');
-          dialog.remove();
-          resolve();
         });
         
         // Test connection
@@ -604,14 +628,14 @@ class Stickr {
         dialog.style.zIndex = '10000000';
         
         dialog.innerHTML = `
-          <div class="dc-dialog" style="max-width: 420px; max-height: 60vh; display: flex; flex-direction: column;">
+          <div class="dc-dialog" style="max-width: 550px; max-height: 80vh; display: flex; flex-direction: column;">
             <div class="dc-dialog-header" style="padding: 1rem 1.25rem 0.75rem;">
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1F2937;">🎫 Jira Integration</h3>
               <p style="margin: 0.5rem 0 0; color: #6B7280; font-size: 12px; line-height: 1.4;">
                 Connect your Jira account to create and attach tickets
               </p>
             </div>
-            <div class="dc-dialog-body" style="padding: 0 1.25rem; max-height: calc(60vh - 140px); overflow-y: auto;">
+            <div class="dc-dialog-body" style="padding: 0 1.25rem; max-height: calc(80vh - 140px); overflow-y: auto;">
               <div class="dc-form-group">
                 <label class="dc-form-label">Jira URL</label>
                 <input 
@@ -791,14 +815,14 @@ class Stickr {
         dialog.style.zIndex = '10000000';
         
         dialog.innerHTML = `
-          <div class="dc-dialog" style="max-width: 420px; max-height: 60vh; display: flex; flex-direction: column;">
+          <div class="dc-dialog" style="max-width: 550px; max-height: 80vh; display: flex; flex-direction: column;">
             <div class="dc-dialog-header" style="padding: 1rem 1.25rem 0.75rem;">
               <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1F2937;">🤖 AI Configuration</h3>
               <p style="margin: 0.5rem 0 0; color: #6B7280; font-size: 12px; line-height: 1.4;">
                 Enable AI-powered chart analysis and insights
               </p>
             </div>
-            <div class="dc-dialog-body" style="padding: 0 1.25rem; max-height: calc(60vh - 140px); overflow-y: auto;">
+            <div class="dc-dialog-body" style="padding: 0 1.25rem; max-height: calc(80vh - 140px); overflow-y: auto;">
               <div class="dc-form-group">
                 <label class="dc-form-label">AI Provider</label>
                 <select id="dc-ai-provider" class="dc-form-input">
@@ -1357,9 +1381,9 @@ class Stickr {
           <div class="dc-header-top">
             <div class="dc-header-left">
               <button class="dc-toggle-btn" title="Collapse Sidebar">
-                <img src="${chrome.runtime.getURL('generated-image-Photoroom.png')}" alt="Collapse" class="dc-toggle-icon">
+                <img src="${chrome.runtime.getURL('/icons/cognito-16.png')}" alt="Collapse" class="dc-toggle-icon">
               </button>
-              <h3>Stickr AI</h3>
+              <h3>Cognito AI</h3>
             </div>
             <div class="dc-header-right">
               <button class="dc-config-btn" id="dc-config-menu" title="Settings & Integrations">
@@ -1388,7 +1412,7 @@ class Stickr {
               </select>
             </div>
             <div class="dc-toolbar-right">
-              <button class="dc-btn dc-btn-primary" id="dc-add-bubble" title="Add a bubble comment to the current chart">
+              <button class="dc-btn dc-btn-primary" id="dc-add-bubble" title="Add context to the current chart">
                 📍
             </button>
               <button class="dc-btn dc-btn-secondary" id="dc-clear-all" title="Clear all notes for this page">
@@ -1422,7 +1446,7 @@ class Stickr {
       this.expandButton = document.createElement('div');
       this.expandButton.id = 'dc-expand-button';
       this.expandButton.className = 'dc-expand-button';
-      this.expandButton.innerHTML = `<img src="${chrome.runtime.getURL('generated-image-Photoroom.png')}" alt="Expand" class="dc-toggle-icon dc-toggle-icon-flipped">`;
+      this.expandButton.innerHTML = `<img src="${chrome.runtime.getURL('/icons/cognito-16.png')}" alt="Expand" class="dc-toggle-icon dc-toggle-icon-flipped">`;
       this.expandButton.title = 'Expand Sidebar';
       document.body.appendChild(this.expandButton);
       
@@ -3582,7 +3606,7 @@ Provide a clear, concise analysis.`);
   }
   
   // Expose helper functions to console for debugging
-  console.log('📍 Stickr Extension Loaded!');
+  console.log('📍 Cognito Extension Loaded!');
   console.log('💡 Access app: window.stickrApp');
   console.log('🗑️ Clear all notes: window.stickrApp.clearAllNotes()');
   console.log('📊 View notes: await chrome.storage.sync.get("comments")');

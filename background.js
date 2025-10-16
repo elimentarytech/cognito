@@ -1,9 +1,9 @@
-// Background service worker for Stickr
+// Background service worker for Cognito
 
 // Listen for installation
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-      console.log('Stickr installed');
+      console.log('Coginto installed');
       
       // Initialize storage
       chrome.storage.sync.set({

@@ -201,7 +201,7 @@
 ## 🐛 Troubleshooting
 
 ### Bubbles Not Showing?
-- ✅ Check "Show Bubbles" toggle is ON
+- ✅ Check "bbles" toggle is ON
 - ✅ Verify time range matches (Grafana)
 - ✅ Check comment filter setting
 - ✅ Wait 2-3 seconds for rendering
