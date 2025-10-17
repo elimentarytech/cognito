@@ -1,0 +1,28 @@
+{
+  "name": "cognito-ai-extension",
+  "version": "1.0.0",
+  "description": "Super charge your static dashboards with context, knowledge and Intelligence",
+  "scripts": {
+    "build": "node build-advanced.js",
+    "build-simple": "node build-simple.js",
+    "build-production": "node build-production.js",
+    "build-debug": "node build-debug.js",
+    "build-minimal": "node build-minimal.js",
+    "build-clean": "node build-clean.js",
+    "package": "npm run build-clean && cd dist && zip -r cognito-ai-extension-final.zip ."
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.0.2",
+    "terser": "^5.24.0"
+  },
+  "keywords": [
+    "chrome-extension",
+    "ai",
+    "dashboard",
+    "analytics",
+    "powerbi",
+    "grafana"
+  ],
+  "author": "Cognito AI",
+  "license": "MIT"
+}

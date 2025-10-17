@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const isSupported = url.includes('powerbi.com') || 
                           url.includes('tableau.com') || 
                           url.includes('grafana') || // Matches grafana.com, grafana.org, grafana.net, etc.
-                          url.includes('localhost:3000'); // Local Grafana instances
+                          url.includes('localhost:3000') ||
+                          url.includes('credit-intelligence.elimentary.com');
       
       if (isSupported) {
         chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
