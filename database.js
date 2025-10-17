@@ -225,48 +225,66 @@ class DatabaseAdapter {
    */
   async testConnection(provider, config) {
     try {
+      console.log('🔍 Testing database connection for provider:', provider);
+      console.log('🔍 Config:', config);
+      
       switch (provider) {
         case 'supabase':
-          const response = await fetch(`${config.url}/rest/v1/`, {
-            headers: {
-              'apikey': config.key,
-              'Authorization': `Bearer ${config.key}`
+          const result = await chrome.runtime.sendMessage({
+            action: 'fetchAPI',
+            url: `${config.url}/rest/v1/`,
+            options: {
+              headers: {
+                'apikey': config.key,
+                'Authorization': `Bearer ${config.key}`
+              }
             }
           });
-          return response.ok;
+          console.log('🔍 Supabase test result:', result);
+          return result.success;
           
         case 'mongodb':
           // Test MongoDB Atlas Data API connection
-          const mongoResponse = await fetch(`${config.uri}/action/findOne`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'api-key': config.apiKey || ''
-            },
-            body: JSON.stringify({
-              dataSource: 'Cluster0',
-              database: config.database,
-              collection: 'stickr_comments',
-              filter: {}
-            })
+          const mongoResult = await chrome.runtime.sendMessage({
+            action: 'fetchAPI',
+            url: `${config.uri}/action/findOne`,
+            options: {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'api-key': config.apiKey || ''
+              },
+              body: JSON.stringify({
+                dataSource: 'Cluster0',
+                database: config.database,
+                collection: 'stickr_comments',
+                filter: {}
+              })
+            }
           });
-          return mongoResponse.ok;
+          console.log('🔍 MongoDB test result:', mongoResult);
+          return mongoResult.success;
           
         case 'postgresql':
         case 'mysql':
           // Test connection via REST endpoint
-          const testResponse = await fetch(`${config.host}:${config.port}/api/test`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              database: config.database,
-              user: config.user,
-              password: config.password
-            })
+          const testResult = await chrome.runtime.sendMessage({
+            action: 'fetchAPI',
+            url: `${config.host}:${config.port}/api/test`,
+            options: {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                database: config.database,
+                user: config.user,
+                password: config.password
+              })
+            }
           });
-          return testResponse.ok;
+          console.log('🔍 PostgreSQL/MySQL test result:', testResult);
+          return testResult.success;
           
         default:
           return false;
@@ -567,4 +585,6 @@ class DatabaseAdapter {
 }
 
 // Export for use in content script
-window.DatabaseAdapter = DatabaseAdapter;
+if (typeof window !== 'undefined') {
+  window.DatabaseAdapter = DatabaseAdapter;
+}

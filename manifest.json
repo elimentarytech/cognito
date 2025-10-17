@@ -18,7 +18,8 @@
       "https://*.supabase.co/*",
       "https://*.atlassian.net/*",
       "https://api.openai.com/*",
-      "https://api.anthropic.com/*"
+      "https://api.anthropic.com/*",
+      "https://generativelanguage.googleapis.com/*"
     ],
     "background": {
       "service_worker": "background.js"
@@ -53,7 +54,20 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["sidebar.html", "/icons/cognito-16.png", "icons/atlassian.png"],
+        "resources": [
+          "sidebar.html", 
+          "/icons/cognito-16.png", 
+          "icons/atlassian.png",
+          "icons/openai-16.png",
+          "icons/openai-24.png", 
+          "icons/openai-48.png",
+          "icons/anthropic-16.png",
+          "icons/anthropic-24.png",
+          "icons/anthropic-48.png",
+          "icons/gemini-16.png",
+          "icons/gemini-24.png",
+          "icons/gemini-48.png"
+        ],
         "matches": ["<all_urls>"]
       }
     ]

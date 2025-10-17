@@ -574,17 +574,30 @@ class Stickr {
           testBtn.textContent = '⏳ Testing...';
           testBtn.disabled = true;
           
-          const isValid = await this.db.testConnection(selectedProvider, config);
-          
-          if (isValid) {
-            successMsg.style.display = 'block';
-            errorMsg.style.display = 'none';
-            connectionValid = true;
-            saveBtn.disabled = false;
-            testBtn.textContent = '✅ Connected';
-            testBtn.style.background = '#10B981';
-          } else {
-            errorMsg.textContent = '❌ Connection failed. Please check your credentials.';
+          try {
+            const isValid = await this.db.testConnection(selectedProvider, config);
+            console.log('🔍 Database test result:', isValid);
+            
+            if (isValid) {
+              successMsg.textContent = '✅ Database connection successful!';
+              successMsg.style.display = 'block';
+              errorMsg.style.display = 'none';
+              connectionValid = true;
+              saveBtn.disabled = false;
+              testBtn.textContent = '✅ Connected';
+              testBtn.style.background = '#10B981';
+            } else {
+              errorMsg.textContent = '❌ Connection failed. Please check your credentials.';
+              errorMsg.style.display = 'block';
+              successMsg.style.display = 'none';
+              connectionValid = false;
+              saveBtn.disabled = true;
+              testBtn.textContent = '🔍 Test Connection';
+              testBtn.disabled = false;
+            }
+          } catch (error) {
+            console.error('🔍 Database test error:', error);
+            errorMsg.textContent = `❌ Connection failed: ${error.message}`;
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             connectionValid = false;
@@ -753,18 +766,30 @@ class Stickr {
           this.jira.jiraEmail = email;
           this.jira.jiraApiToken = token;
           
-          const result = await this.jira.testConnection();
-          
-          if (result.success) {
-            successMsg.textContent = `✅ Connected as ${result.user}`;
-            successMsg.style.display = 'block';
-            errorMsg.style.display = 'none';
-            connectionValid = true;
-            saveBtn.disabled = false;
-            testBtn.textContent = '✅ Connected';
-            testBtn.style.background = '#10B981';
-          } else {
-            errorMsg.textContent = `❌ ${result.error}`;
+          try {
+            const result = await this.jira.testConnection();
+            console.log('🔍 Jira test result:', result);
+            
+            if (result.success) {
+              successMsg.textContent = `✅ Connected as ${result.user}`;
+              successMsg.style.display = 'block';
+              errorMsg.style.display = 'none';
+              connectionValid = true;
+              saveBtn.disabled = false;
+              testBtn.textContent = '✅ Connected';
+              testBtn.style.background = '#10B981';
+            } else {
+              errorMsg.textContent = `❌ ${result.error}`;
+              errorMsg.style.display = 'block';
+              successMsg.style.display = 'none';
+              connectionValid = false;
+              saveBtn.disabled = true;
+              testBtn.textContent = '🔍 Test Connection';
+              testBtn.disabled = false;
+            }
+          } catch (error) {
+            console.error('🔍 Jira test error:', error);
+            errorMsg.textContent = `❌ Connection failed: ${error.message}`;
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             connectionValid = false;
@@ -833,10 +858,18 @@ class Stickr {
             <div class="dc-dialog-body" style="padding: 0 1.25rem; max-height: calc(80vh - 140px); overflow-y: auto;">
               <div class="dc-form-group">
                 <label class="dc-form-label">AI Provider</label>
-                <select id="dc-ai-provider" class="dc-form-input">
-                  <option value="">Select Provider</option>
-                  <option value="openai" ${this.ai.provider === 'openai' ? 'selected' : ''}>OpenAI (GPT-4o-mini)</option>
-                  <option value="anthropic" ${this.ai.provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude 3.5)</option>
+        <select id="dc-ai-provider" class="dc-form-input">
+          <option value="">Select Provider</option>
+          <option value="openai" ${this.ai.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+          <option value="anthropic" ${this.ai.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+          <option value="gemini" ${this.ai.provider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
+        </select>
+              </div>
+              
+              <div class="dc-form-group" id="dc-model-selection" style="display: none;">
+                <label class="dc-form-label">Model Version</label>
+                <select id="dc-ai-model" class="dc-form-input">
+                  <option value="">Select Model</option>
                 </select>
               </div>
               
@@ -846,7 +879,7 @@ class Stickr {
                   type="password" 
                   id="dc-ai-key" 
                   class="dc-form-input" 
-                  placeholder="sk-... or sk-ant-..."
+                  placeholder="Enter your API key"
                   value="${this.ai.apiKey || ''}"
                 >
               </div>
@@ -857,8 +890,9 @@ class Stickr {
                   <strong style="font-size: 12px; color: #0369A1;">Get API Keys:</strong>
                 </div>
                 <div style="color: #0369A1; margin-left: 1rem;">
-                  • <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #0369A1; text-decoration: none;">OpenAI</a> - GPT-4o-mini (cheaper, good quality)<br>
-                  • <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: #0369A1; text-decoration: none;">Anthropic</a> - Claude 3.5 Sonnet (excellent quality)
+                  • <a href="https://platform.openai.com/api-keys" target="_blank" style="color: #0369A1; text-decoration: none;">OpenAI</a> - GPT-5, GPT-4, GPT-4-turbo<br>
+                  • <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: #0369A1; text-decoration: none;">Anthropic</a> - Claude 4.5, 4.0, 3.5 Sonnet<br>
+                  • <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #0369A1; text-decoration: none;">Google AI Studio</a> - Gemini 2.0 Flash, 1.5 Flash
                 </div>
               </div>
               
@@ -895,6 +929,8 @@ class Stickr {
         document.body.appendChild(dialog);
         
         const providerSelect = document.getElementById('dc-ai-provider');
+        const modelSelect = document.getElementById('dc-ai-model');
+        const modelSelection = document.getElementById('dc-model-selection');
         const keyInput = document.getElementById('dc-ai-key');
         const errorMsg = document.getElementById('dc-ai-error');
         const successMsg = document.getElementById('dc-ai-success');
@@ -904,9 +940,58 @@ class Stickr {
         
         let connectionValid = false;
         
+        // Model options for each provider
+        const modelOptions = {
+          'openai': [
+            { value: 'gpt-5', text: 'GPT-5 (Latest)' },
+            { value: 'gpt-4', text: 'GPT-4' },
+            { value: 'gpt-4-turbo', text: 'GPT-4 Turbo' }
+          ],
+          'anthropic': [
+            { value: 'claude-4-5-sonnet-20241022', text: 'Claude 4.5 Sonnet (Latest)' },
+            { value: 'claude-3-5-sonnet-20241022', text: 'Claude 3.5 Sonnet' },
+            { value: 'claude-3-5-haiku-20241022', text: 'Claude 3.5 Haiku' }
+          ],
+          'gemini': [
+            { value: 'gemini-2.0-flash', text: 'Gemini 2.0 Flash (Latest)' },
+            { value: 'gemini-1.5-flash', text: 'Gemini 1.5 Flash' }
+          ]
+        };
+
+        // Handle provider selection
+        providerSelect.addEventListener('change', () => {
+          const selectedProvider = providerSelect.value;
+          modelSelect.innerHTML = '<option value="">Select Model</option>';
+          
+          if (selectedProvider && modelOptions[selectedProvider]) {
+            modelSelection.style.display = 'block';
+            modelOptions[selectedProvider].forEach(model => {
+              const option = document.createElement('option');
+              option.value = model.value;
+              option.textContent = model.text;
+              modelSelect.appendChild(option);
+            });
+          } else {
+            modelSelection.style.display = 'none';
+          }
+        });
+
+        // Initialize with current provider if configured
         if (this.ai.isConfigured) {
           connectionValid = true;
           saveBtn.disabled = false;
+          if (this.ai.provider && modelOptions[this.ai.provider]) {
+            modelSelection.style.display = 'block';
+            modelOptions[this.ai.provider].forEach(model => {
+              const option = document.createElement('option');
+              option.value = model.value;
+              option.textContent = model.text;
+              if (this.ai.model === model.value) {
+                option.selected = true;
+              }
+              modelSelect.appendChild(option);
+            });
+          }
         }
         
         closeBtn.addEventListener('click', () => {
@@ -916,10 +1001,11 @@ class Stickr {
         
         testBtn.addEventListener('click', async () => {
           const provider = providerSelect.value;
+          const model = modelSelect.value;
           const key = keyInput.value.trim();
           
-          if (!provider || !key) {
-            errorMsg.textContent = 'Please select provider and enter API key';
+          if (!provider || !model || !key) {
+            errorMsg.textContent = 'Please select provider, model, and enter API key';
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             return;
@@ -930,12 +1016,14 @@ class Stickr {
           
           // Temporarily set for testing
           this.ai.provider = provider;
+          this.ai.model = model;
           this.ai.apiKey = key;
           
           const isValid = await this.ai.testConnection();
           
           if (isValid) {
-            successMsg.textContent = `✅ ${provider === 'openai' ? 'OpenAI' : 'Claude'} connected successfully!`;
+            const modelText = modelOptions[provider].find(m => m.value === model)?.text || model;
+            successMsg.textContent = `✅ ${provider.charAt(0).toUpperCase() + provider.slice(1)} (${modelText}) connected successfully!`;
             successMsg.style.display = 'block';
             errorMsg.style.display = 'none';
             connectionValid = true;
@@ -961,14 +1049,17 @@ class Stickr {
           }
           
           const provider = providerSelect.value;
+          const model = modelSelect.value;
           const key = keyInput.value.trim();
           
           await chrome.storage.sync.set({ 
             aiProvider: provider,
+            aiModel: model,
             aiApiKey: key
           });
           
           this.ai.provider = provider;
+          this.ai.model = model;
           this.ai.apiKey = key;
           this.ai.isConfigured = true;
           
@@ -977,7 +1068,7 @@ class Stickr {
           resolve();
         });
         
-        [providerSelect, keyInput].forEach(input => {
+        [providerSelect, modelSelect, keyInput].forEach(input => {
           input.addEventListener('input', () => {
             errorMsg.style.display = 'none';
             successMsg.style.display = 'none';
@@ -1950,9 +2041,13 @@ class Stickr {
               <option value="reference">📚 Reference</option>
             </select>
           </div>
-          <div class="dc-dialog-footer">
-            <button class="dc-btn dc-btn-secondary dc-cancel">Cancel</button>
-            <button class="dc-btn dc-btn-primary dc-save">💾 Save Comment</button>
+          <div class="dc-dialog-footer" style="display: flex; gap: 0.5rem;">
+            <button class="dc-btn dc-btn-secondary dc-cancel" style="flex: 1;">
+              Cancel
+            </button>
+            <button class="dc-btn dc-btn-primary dc-save" style="flex: 1;">
+              💾 Save Comment
+            </button>
           </div>
         </div>
       `;
@@ -2063,9 +2158,13 @@ class Stickr {
             <label>Link (optional):</label>
             <input type="url" class="dc-input" id="dc-reply-link" placeholder="https://..." />
           </div>
-          <div class="dc-dialog-actions">
-            <button class="dc-btn dc-btn-secondary dc-cancel">Cancel</button>
-            <button class="dc-btn dc-btn-primary dc-save-reply">Reply</button>
+          <div class="dc-dialog-footer" style="display: flex; gap: 0.5rem;">
+            <button class="dc-btn dc-btn-secondary dc-cancel" style="flex: 1;">
+              Cancel
+            </button>
+            <button class="dc-btn dc-btn-primary dc-save-reply" style="flex: 1;">
+              Reply
+            </button>
           </div>
         </div>
       `;
@@ -2246,7 +2345,7 @@ class Stickr {
             <div class="dc-comment-actions">
               <button class="dc-btn-icon dc-reply" data-id="${comment.id}" title="Reply">💬</button>
               ${this.jira.isConfigured && !comment.jiraTicket ? `<button class="dc-btn-icon dc-create-jira" data-id="${comment.id}" title="Create Jira Ticket"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 16px; height: 16px;"></button>` : ''}
-              ${this.ai.isConfigured && isBubble ? `<button class="dc-btn-icon dc-ai-analyze" data-id="${comment.id}" title="AI Analyze Chart">✨</button>` : ''}
+              ${this.ai.isConfigured && isBubble ? `<button class="dc-btn-icon dc-ai-analyze" data-id="${comment.id}" title="AI Analyze Chart">${this.getAIProviderIcon()}</button>` : ''}
             <button class="dc-btn-icon dc-delete" data-id="${comment.id}" title="Delete">🗑️</button>
           </div>
         </div>
@@ -2312,6 +2411,17 @@ class Stickr {
       if (diffDays < 7) return `${diffDays}d ago`;
       
       return date.toLocaleDateString();
+    }
+
+    // Get AI provider icon
+    getAIProviderIcon() {
+      const providerIcons = {
+        'openai': `<img src="${chrome.runtime.getURL('icons/openai-16.png')}" alt="OpenAI" style="width: 16px; height: 16px;">`,
+        'anthropic': `<img src="${chrome.runtime.getURL('icons/anthropic-16.png')}" alt="Anthropic" style="width: 16px; height: 16px;">`, 
+        'gemini': `<img src="${chrome.runtime.getURL('icons/gemini-16.png')}" alt="Gemini" style="width: 16px; height: 16px;">`
+      };
+      const currentProvider = this.ai.provider || 'openai';
+      return providerIcons[currentProvider] || `<img src="${chrome.runtime.getURL('icons/openai-16.png')}" alt="OpenAI" style="width: 16px; height: 16px;">`;
     }
   
     // Ensure all bubbles that should be visible are actually visible (Grafana specific)
@@ -2866,9 +2976,11 @@ class Stickr {
     
     // Show configuration menu
     async showConfigMenu() {
-      const result = await chrome.storage.sync.get('dbProvider');
+      const result = await chrome.storage.sync.get(['dbProvider', 'aiProvider']);
       const dbProvider = result.dbProvider || 'none';
+      const aiProvider = result.aiProvider || 'none';
       let dbStatusText = 'Configure team collaboration database';
+      let aiStatusText = 'Configure AI provider for chart analysis';
       
       if (dbProvider === 'local') {
         dbStatusText = 'Currently using local storage (solo mode)';
@@ -2876,6 +2988,17 @@ class Stickr {
         dbStatusText = 'Currently using Supabase';
       } else if (dbProvider === 'mongodb') {
         dbStatusText = 'Currently using MongoDB';
+      }
+      
+      if (aiProvider === 'openai') {
+        const modelName = this.ai.model || 'GPT-5';
+        aiStatusText = `Currently using OpenAI (${modelName})`;
+      } else if (aiProvider === 'anthropic') {
+        const modelName = this.ai.model || 'Claude 4.5 Sonnet';
+        aiStatusText = `Currently using Anthropic (${modelName})`;
+      } else if (aiProvider === 'gemini') {
+        const modelName = this.ai.model || 'Gemini Pro';
+        aiStatusText = `Currently using Google Gemini (${modelName})`;
       }
       
       const menu = document.createElement('div');
@@ -2911,7 +3034,7 @@ class Stickr {
               <div class="dc-config-menu-icon">🤖</div>
               <div class="dc-config-menu-text">
                 <div class="dc-config-menu-title">AI Configuration</div>
-                <div class="dc-config-menu-desc">Enable AI-powered chart analysis</div>
+                <div class="dc-config-menu-desc">${aiStatusText}</div>
               </div>
               <div class="dc-config-menu-status">${this.ai.isConfigured ? '✅' : '⚙️'}</div>
             </button>
@@ -3503,6 +3626,21 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
       
       const chartElement = data.chartElement;
       
+      // Get current AI provider for icon
+      const providerIcons = {
+        'openai': `<img src="${chrome.runtime.getURL('icons/openai-48.png')}" alt="OpenAI" style="width: 48px; height: 48px;">`,
+        'anthropic': `<img src="${chrome.runtime.getURL('icons/anthropic-48.png')}" alt="Anthropic" style="width: 48px; height: 48px;">`, 
+        'gemini': `<img src="${chrome.runtime.getURL('icons/gemini-48.png')}" alt="Gemini" style="width: 48px; height: 48px;">`
+      };
+      const providerNames = {
+        'openai': 'OpenAI (GPT-5)',
+        'anthropic': 'Claude (4.5 Sonnet)',
+        'gemini': 'Google Gemini (2.5 Flash)'
+      };
+      const currentProvider = this.ai.provider || 'openai';
+      const providerIcon = providerIcons[currentProvider] || `<img src="${chrome.runtime.getURL('icons/openai-48.png')}" alt="OpenAI" style="width: 48px; height: 48px;">`;
+      const providerName = providerNames[currentProvider] || 'AI';
+
       // Show loading dialog
       const loadingDialog = document.createElement('div');
       loadingDialog.className = 'dc-dialog-overlay';
@@ -3513,8 +3651,9 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
             <h3>✨ AI Analysis</h3>
           </div>
           <div class="dc-dialog-body" style="text-align: center; padding: 2rem;">
-            <div style="font-size: 48px; margin-bottom: 1rem;">🤖</div>
-            <p style="color: #666;">Capturing and analyzing chart...</p>
+            <div style="margin-bottom: 1rem;">${providerIcon}</div>
+            <p style="color: #666; margin-bottom: 0.5rem;">Analyzing with ${providerName}...</p>
+            <p style="color: #999; font-size: 14px;">Capturing and analyzing chart...</p>
             <div class="dc-loading-spinner"></div>
           </div>
         </div>
@@ -3618,8 +3757,8 @@ Provide a clear, concise analysis.`);
             <div class="dc-dialog-body">
               <p style="color: #EF4444;">${error.message}</p>
             </div>
-            <div class="dc-dialog-footer">
-              <button class="dc-btn dc-btn-primary" onclick="this.closest('.dc-dialog-overlay').remove()">
+            <div class="dc-dialog-footer" style="display: flex; justify-content: center;">
+              <button class="dc-btn dc-btn-primary" onclick="this.closest('.dc-dialog-overlay').remove()" style="flex: 1; max-width: 200px;">
                 Close
               </button>
             </div>

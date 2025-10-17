@@ -31,6 +31,11 @@ class JiraIntegration {
 
   async testConnection() {
     try {
+      console.log('🔍 Testing Jira connection...');
+      console.log('🔍 Jira URL:', this.jiraUrl);
+      console.log('🔍 Jira Email:', this.jiraEmail);
+      console.log('🔍 API Token present:', !!this.jiraApiToken);
+      
       const auth = btoa(`${this.jiraEmail}:${this.jiraApiToken}`);
       
       // Use background script to bypass CORS
@@ -348,19 +353,21 @@ class JiraIntegration {
 
 class AIIntegration {
   constructor() {
-    this.provider = null; // 'openai' or 'anthropic'
+    this.provider = null; // 'openai', 'anthropic', or 'gemini'
+    this.model = null; // specific model version
     this.apiKey = null;
     this.isConfigured = false;
   }
 
   async init() {
-    const config = await chrome.storage.sync.get(['aiProvider', 'aiApiKey']);
+    const config = await chrome.storage.sync.get(['aiProvider', 'aiModel', 'aiApiKey']);
     
-    if (config.aiProvider && config.aiApiKey) {
+    if (config.aiProvider && config.aiModel && config.aiApiKey) {
       this.provider = config.aiProvider;
+      this.model = config.aiModel;
       this.apiKey = config.aiApiKey;
       this.isConfigured = true;
-      console.log(`✅ AI configured: ${this.provider}`);
+      console.log(`✅ AI configured: ${this.provider} (${this.model})`);
       return true;
     }
     
@@ -370,7 +377,11 @@ class AIIntegration {
 
   async testConnection() {
     try {
+      console.log('🔍 Testing connection for provider:', this.provider);
+      console.log('🔍 API Key present:', !!this.apiKey);
+      
       if (this.provider === 'openai') {
+        console.log('🔍 Testing OpenAI connection...');
         // Use background script to bypass CORS
         const result = await chrome.runtime.sendMessage({
           action: 'fetchAPI',
@@ -403,7 +414,7 @@ class AIIntegration {
               'content-type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'claude-3-haiku-20240307',
+              model: this.model || 'claude-3-5-sonnet-20241022',
               max_tokens: 10,
               messages: [{ role: 'user', content: 'test' }]
             })
@@ -415,6 +426,31 @@ class AIIntegration {
           return true;
         } else {
           console.error('❌ Anthropic/Claude connection failed:', result.error);
+          return false;
+        }
+      } else if (this.provider === 'gemini') {
+        // Test Gemini API
+        const result = await chrome.runtime.sendMessage({
+          action: 'fetchAPI',
+          url: `https://generativelanguage.googleapis.com/v1beta/models/${this.model || 'gemini-pro'}:generateContent?key=${this.apiKey}`,
+          options: {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: 'test' }]
+              }]
+            })
+          }
+        });
+        
+        if (result.success) {
+          console.log('✅ Google Gemini connection successful');
+          return true;
+        } else {
+          console.error('❌ Google Gemini connection failed:', result.error);
           return false;
         }
       }
@@ -451,7 +487,7 @@ Provide a clear, concise analysis.`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: this.model || 'gpt-5',
               messages: [
                 {
                   role: 'user',
@@ -491,7 +527,7 @@ Provide a clear, concise analysis.`;
               'content-type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'claude-3-5-sonnet-20241022',
+              model: this.model || 'claude-4-5-sonnet-20241022',
               max_tokens: 1024,
               messages: [
                 {
@@ -520,6 +556,40 @@ Provide a clear, concise analysis.`;
           return result.data.content[0].text;
         } else {
           throw new Error(result.error || 'Failed to analyze image');
+        }
+        
+      } else if (this.provider === 'gemini') {
+        // Google Gemini Vision
+        const base64Image = imageDataUrl.split(',')[1];
+        
+        const result = await chrome.runtime.sendMessage({
+          action: 'fetchAPI',
+          url: `https://generativelanguage.googleapis.com/v1beta/models/${this.model || 'gemini-pro'}:generateContent?key=${this.apiKey}`,
+          options: {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: base64Image
+                    }
+                  }
+                ]
+              }]
+            })
+          }
+        });
+        
+        if (result.success && result.data.candidates && result.data.candidates[0]) {
+          return result.data.candidates[0].content.parts[0].text;
+        } else {
+          throw new Error(result.error || 'Failed to analyze image with Gemini');
         }
       }
       
@@ -681,6 +751,8 @@ Provide a 1-2 sentence actionable insight.`;
 }
 
 // Export for use in content script
-window.JiraIntegration = JiraIntegration;
-window.AIIntegration = AIIntegration;
+if (typeof window !== 'undefined') {
+  window.JiraIntegration = JiraIntegration;
+  window.AIIntegration = AIIntegration;
+}
 
