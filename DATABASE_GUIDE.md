@@ -51,7 +51,7 @@ Stickr AI now supports **4 database providers** for team collaboration:
 3. Paste and run this SQL:
 
 ```sql
-CREATE TABLE stickr_comments (
+CREATE TABLE cognito_comments (
   id TEXT PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -71,9 +71,9 @@ CREATE TABLE stickr_comments (
 );
 
 -- Indexes for better performance
-CREATE INDEX idx_page_id ON stickr_comments("pageId");
-CREATE INDEX idx_chart_hash ON stickr_comments("chartHash");
-CREATE INDEX idx_author ON stickr_comments(author);
+CREATE INDEX idx_page_id ON cognito_comments("pageId");
+CREATE INDEX idx_chart_hash ON cognito_comments("chartHash");
+CREATE INDEX idx_author ON cognito_comments(author);
 ```
 
 #### Step 4: Configure in Extension
@@ -107,7 +107,7 @@ CREATE INDEX idx_author ON stickr_comments(author);
 1. Go to **Browse Collections**
 2. Click "Add My Own Data"
 3. Database name: `stickr`
-4. Collection name: `stickr_comments`
+4. Collection name: `cognito_comments`
 
 **MongoDB Schema (JSON):**
 ```json
@@ -170,7 +170,7 @@ CREATE DATABASE stickr;
 
 \c stickr
 
-CREATE TABLE stickr_comments (
+CREATE TABLE cognito_comments (
   id TEXT PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -189,8 +189,8 @@ CREATE TABLE stickr_comments (
   "jiraTicket" JSONB    -- For Jira integration
 );
 
-CREATE INDEX idx_page_id ON stickr_comments("pageId");
-CREATE INDEX idx_chart_hash ON stickr_comments("chartHash");
+CREATE INDEX idx_page_id ON cognito_comments("pageId");
+CREATE INDEX idx_chart_hash ON cognito_comments("chartHash");
 ```
 
 #### Step 2: Create REST API Wrapper
@@ -264,7 +264,7 @@ CREATE DATABASE stickr;
 
 USE stickr;
 
-CREATE TABLE stickr_comments (
+CREATE TABLE cognito_comments (
   id VARCHAR(255) PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -281,8 +281,8 @@ CREATE TABLE stickr_comments (
   relativeY FLOAT
 );
 
-CREATE INDEX idx_page_id ON stickr_comments(pageId);
-CREATE INDEX idx_chart_hash ON stickr_comments(chartHash);
+CREATE INDEX idx_page_id ON cognito_comments(pageId);
+CREATE INDEX idx_chart_hash ON cognito_comments(chartHash);
 ```
 
 #### Step 2: Create REST API Wrapper
@@ -360,7 +360,7 @@ Same as PostgreSQL - deploy with HTTPS and configure in extension.
 All providers use the same schema:
 
 ```
-stickr_comments
+cognito_comments
 ├── id (TEXT/VARCHAR) - Unique comment ID
 ├── text (TEXT) - Comment content
 ├── link (TEXT) - Optional reference URL
@@ -514,7 +514,7 @@ Run this SQL in the SQL Editor:
 
 ```sql
 -- Add new columns for filter-aware comments and Jira integration
-ALTER TABLE stickr_comments 
+ALTER TABLE cognito_comments 
 ADD COLUMN IF NOT EXISTS "filterState" JSONB,
 ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
 ```
@@ -528,7 +528,7 @@ ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
 Run this SQL:
 
 ```sql
-ALTER TABLE stickr_comments 
+ALTER TABLE cognito_comments 
 ADD COLUMN IF NOT EXISTS "filterState" JSONB,
 ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
 ```
@@ -538,7 +538,7 @@ ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
 Run this SQL:
 
 ```sql
-ALTER TABLE stickr_comments 
+ALTER TABLE cognito_comments 
 ADD COLUMN filterState JSON DEFAULT NULL,
 ADD COLUMN jiraTicket JSON DEFAULT NULL;
 ```
@@ -565,7 +565,7 @@ After running the migration, verify the columns exist:
 ```sql
 SELECT column_name, data_type 
 FROM information_schema.columns 
-WHERE table_name = 'stickr_comments';
+WHERE table_name = 'cognito_comments';
 ```
 
 **MongoDB:**

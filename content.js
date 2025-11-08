@@ -11,7 +11,67 @@ class Stickr {
     this.mutationObserver = null;
     this.bubblesHidden = false; // Track if bubbles are hidden by user
     this.currentFilterState = null; // Track current time range filters for Grafana
+    this.extensionContextValid = true; // Track if extension context is still valid
+    this.userEmail = null;
+    this.userRole = null;
+    this.username = null;
       this.init();
+    }
+
+    // Check if Chrome extension context is still valid
+    isExtensionContextValid() {
+      try {
+        // Try to access chrome.runtime to check if context is still valid
+        return typeof chrome !== 'undefined' && 
+               chrome.runtime && 
+               chrome.runtime.id !== undefined;
+      } catch (error) {
+        console.warn('Extension context invalidated:', error.message);
+        this.extensionContextValid = false;
+        return false;
+      }
+    }
+
+    // Safe wrapper for Chrome storage operations
+    async safeChromeStorage(operation) {
+      if (!this.isExtensionContextValid()) {
+        console.warn('Extension context invalidated, skipping storage operation');
+        return null;
+      }
+      
+      try {
+        return await operation();
+      } catch (error) {
+        if (error.message.includes('Extension context invalidated')) {
+          console.warn('Extension context invalidated during storage operation');
+          this.extensionContextValid = false;
+          this.handleExtensionContextInvalidation();
+          return null;
+        }
+        throw error;
+      }
+    }
+
+    // Handle extension context invalidation gracefully
+    handleExtensionContextInvalidation() {
+      console.warn('Extension context invalidated - cleaning up and showing user notification');
+      
+      // Clean up observers
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+        this.resizeObserver = null;
+      }
+      
+      if (this.mutationObserver) {
+        this.mutationObserver.disconnect();
+        this.mutationObserver = null;
+      }
+      
+      // Show user notification
+      this.showToast('Extension was reloaded. Please refresh the page to continue using Cognito AI.', 'warning', 10000);
+      
+      // Disable all interactive features
+      this.extensionContextValid = false;
     }
   
     // Detect which platform we're on
@@ -130,14 +190,49 @@ class Stickr {
     }
   
     async init() {
-      // Initialize integrations
-      this.db = new window.DatabaseAdapter();
-      this.jira = new window.JiraIntegration();
-      this.ai = new window.AIIntegration();
+      // Wait for classes to be available (with timeout)
+      const maxWait = 5000; // 5 seconds
+      const startTime = Date.now();
       
-      await this.db.init();
-      await this.jira.init();
-      await this.ai.init();
+      while (typeof window.DatabaseAdapter === 'undefined' || 
+             typeof window.JiraIntegration === 'undefined' || 
+             typeof window.AIIntegration === 'undefined') {
+        if (Date.now() - startTime > maxWait) {
+          console.error('Timeout waiting for integration classes to load');
+          // Create fallback objects
+          this.db = { init: async () => false, isConfigured: false };
+          this.jira = { init: async () => false, isConfigured: false };
+          this.ai = { init: async () => false, isConfigured: false };
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50)); // Wait 50ms and check again
+      }
+      
+      // Initialize integrations
+      try {
+        if (typeof window.DatabaseAdapter !== 'undefined' && 
+            typeof window.JiraIntegration !== 'undefined' && 
+            typeof window.AIIntegration !== 'undefined') {
+          this.db = new window.DatabaseAdapter();
+          this.jira = new window.JiraIntegration();
+          this.ai = new window.AIIntegration();
+          
+          await this.db.init();
+          await this.jira.init();
+          await this.ai.init();
+        } else {
+          console.warn('Some integration classes are not available, using fallback objects');
+          this.db = { init: async () => false, isConfigured: false };
+          this.jira = { init: async () => false, isConfigured: false };
+          this.ai = { init: async () => false, isConfigured: false };
+        }
+      } catch (error) {
+        console.error('Error initializing integrations:', error);
+        // Create fallback objects if initialization fails
+        this.db = { init: async () => false, isConfigured: false };
+        this.jira = { init: async () => false, isConfigured: false };
+        this.ai = { init: async () => false, isConfigured: false };
+      }
       
       // Check if user has registered
       await this.checkUserRegistration();
@@ -169,15 +264,16 @@ class Stickr {
     
     // Check if user is registered, if not prompt for email
     async checkUserRegistration() {
-      const result = await chrome.storage.sync.get('userEmail');
+      const result = await this.safeChromeStorage(() => chrome.storage.sync.get(['userEmail', 'userRole']));
       
-      if (!result.userEmail) {
+      if (!result || !result.userEmail) {
         // Show email registration dialog
         await this.showEmailDialog();
       } else {
         this.userEmail = result.userEmail;
+        this.userRole = result.userRole || '';
         this.username = result.userEmail.split('@')[0];
-        console.log('👤 User:', this.username);
+        console.log('👤 User:', this.username, 'Role:', this.userRole || 'Not specified');
       }
     }
     
@@ -198,14 +294,44 @@ class Stickr {
               <p style="margin-bottom: 1.5rem; font-size: 16px; font-weight: 500; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
                 ⚡ Supercharge Your Dashboards with AI-Powered Insights
               </p>
-              <input 
-                type="email" 
-                id="dc-email-input" 
-                class="dc-comment-input" 
-                placeholder="your.email@company.com"
-                style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; min-height: auto; height: auto;"
-              >
-              <p id="dc-email-error" style="color: #EF4444; font-size: 12px; margin-top: 0.5rem; display: none;">Please enter a valid email address</p>
+              <div style="margin-bottom: 1rem;">
+                <label for="dc-email-input" style="display: block; margin-bottom: 0.5rem; font-size: 14px; font-weight: 500; color: #374151;">Email Address</label>
+                <input 
+                  type="email" 
+                  id="dc-email-input" 
+                  class="dc-comment-input" 
+                  placeholder="your.email@company.com"
+                  style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; min-height: auto; height: auto; box-sizing: border-box;"
+                >
+              </div>
+              <div style="margin-bottom: 1rem;">
+                <label for="dc-role-input" style="display: block; margin-bottom: 0.5rem; font-size: 14px; font-weight: 500; color: #374151;">Your Role</label>
+                <select 
+                  id="dc-role-input" 
+                  style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; min-height: auto; height: auto; box-sizing: border-box; background: white; cursor: pointer;"
+                >
+                  <option value="">Select your role...</option>
+                  <option value="Data Analyst">Data Analyst</option>
+                  <option value="Business Analyst">Business Analyst</option>
+                  <option value="Data Scientist">Data Scientist</option>
+                  <option value="Product Manager">Product Manager</option>
+                  <option value="Engineering Manager">Engineering Manager</option>
+                  <option value="Executive">Executive</option>
+                  <option value="Operations Manager">Operations Manager</option>
+                  <option value="Marketing Manager">Marketing Manager</option>
+                  <option value="Sales Manager">Sales Manager</option>
+                  <option value="Finance Manager">Finance Manager</option>
+                  <option value="Developer">Developer</option>
+                  <option value="Other">Other</option>
+                </select>
+                <input 
+                  type="text" 
+                  id="dc-role-custom" 
+                  placeholder="Specify your role"
+                  style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-top: 0.5rem; min-height: auto; height: auto; box-sizing: border-box; display: none;"
+                >
+              </div>
+              <p id="dc-email-error" style="color: #EF4444; font-size: 12px; margin-top: 0.5rem; display: none;"></p>
             </div>
             <div class="dc-dialog-footer" style="padding-top: 1rem;">
               <button class="dc-btn dc-btn-primary" id="dc-email-submit" style="width: 100%; padding: 0.65rem 1.5rem; font-size: 15px;">
@@ -218,9 +344,22 @@ class Stickr {
         document.body.appendChild(dialog);
         
         const emailInput = document.getElementById('dc-email-input');
+        const roleSelect = document.getElementById('dc-role-input');
+        const roleCustomInput = document.getElementById('dc-role-custom');
         const errorMsg = document.getElementById('dc-email-error');
         const submitBtn = document.getElementById('dc-email-submit');
         const closeBtn = document.getElementById('dc-email-close');
+        
+        // Show custom role input when "Other" is selected
+        roleSelect.addEventListener('change', () => {
+          if (roleSelect.value === 'Other') {
+            roleCustomInput.style.display = 'block';
+            roleCustomInput.focus();
+          } else {
+            roleCustomInput.style.display = 'none';
+            roleCustomInput.value = '';
+          }
+        });
         
         // Close button handler
         closeBtn.addEventListener('click', () => {
@@ -232,46 +371,76 @@ class Stickr {
         
         const validateAndSubmit = async () => {
           const email = emailInput.value.trim();
+          const role = roleSelect.value === 'Other' 
+            ? roleCustomInput.value.trim() 
+            : roleSelect.value;
           
           // Email validation
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           
           if (!email || !emailRegex.test(email)) {
+            errorMsg.textContent = 'Please enter a valid email address';
             errorMsg.style.display = 'block';
             emailInput.style.borderColor = '#EF4444';
             return;
           }
           
-          // Save email
-          this.userEmail = email;
-          this.username = email.split('@')[0];
-          await chrome.storage.sync.set({ userEmail: email });
+          if (!role) {
+            errorMsg.textContent = 'Please select or specify your role';
+            errorMsg.style.display = 'block';
+            roleSelect.style.borderColor = '#EF4444';
+            return;
+          }
           
-          console.log('✅ User registered:', this.username);
+          // Save email and role
+          this.userEmail = email;
+          this.userRole = role;
+          this.username = email.split('@')[0];
+          await this.safeChromeStorage(() => chrome.storage.sync.set({ 
+            userEmail: email,
+            userRole: role
+          }));
+          
+          console.log('✅ User registered:', this.username, 'Role:', role);
           dialog.remove();
           resolve();
         };
         
         submitBtn.addEventListener('click', validateAndSubmit);
         
-        emailInput.addEventListener('keydown', (e) => {
+        const handleEnterKey = (e) => {
           if (e.key === 'Enter') {
+            e.preventDefault();
             validateAndSubmit();
           }
-        });
+        };
+        
+        emailInput.addEventListener('keydown', handleEnterKey);
+        roleSelect.addEventListener('keydown', handleEnterKey);
+        roleCustomInput.addEventListener('keydown', handleEnterKey);
         
         emailInput.addEventListener('input', () => {
           errorMsg.style.display = 'none';
           emailInput.style.borderColor = '#ddd';
+        });
+        
+        roleSelect.addEventListener('input', () => {
+          errorMsg.style.display = 'none';
+          roleSelect.style.borderColor = '#ddd';
+        });
+        
+        roleCustomInput.addEventListener('input', () => {
+          errorMsg.style.display = 'none';
+          roleCustomInput.style.borderColor = '#ddd';
         });
       });
     }
     
     // Check if database is configured, if not prompt for configuration
     async checkDatabaseConfiguration() {
-      const result = await chrome.storage.sync.get(['dbProvider']);
+      const result = await this.safeChromeStorage(() => chrome.storage.sync.get(['dbProvider']));
       
-      if (!result.dbProvider) {
+      if (!result || !result.dbProvider) {
         // Show database configuration dialog
         await this.showDatabaseDialog();
       }
@@ -327,14 +496,22 @@ class Stickr {
               <div id="form-supabase" class="db-form" style="display: none;">
                 <div class="db-setup-guide">
                   <div class="db-setup-guide-title">📚 Supabase Setup Steps:</div>
-                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6; font-size: 12px;">
+                  <ol>
                     <li>Go to <a href="https://supabase.com" target="_blank" style="color: #0066cc; font-weight: 500;">supabase.com</a> and create a free account</li>
                     <li>Click <strong>"New Project"</strong> and fill in project details</li>
                     <li>Once created, go to <strong>Settings → API</strong></li>
                     <li>Copy the <strong>"Project URL"</strong> (looks like https://xxxxx.supabase.co)</li>
                     <li>Copy the <strong>"anon public"</strong> API key</li>
                     <li>Go to <strong>SQL Editor</strong> and run this SQL:
-                      <pre style="background: #FEF3C7; padding: 0.75rem; margin-top: 0.75rem; border-radius: 6px; font-size: 12px; overflow-x: auto; line-height: 1.5; border: 2px solid #F59E0B; font-family: 'Monaco', 'Courier New', monospace; color: #92400E; display: block;">CREATE TABLE cognito_comments (
+                      <div style="position: relative; margin-top: 0.75rem;">
+                        <button class="dc-copy-sql-btn" id="dc-copy-sql-btn" title="Copy SQL command" style="position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(255, 255, 255, 0.9); border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.375rem 0.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; font-size: 11px; color: #6B7280; transition: all 0.2s; z-index: 10;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                          <span class="dc-copy-text">Copy</span>
+                        </button>
+                        <pre id="dc-sql-command">CREATE TABLE cognito_comments (
   id TEXT PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -348,8 +525,11 @@ class Stickr {
   "chartHash" TEXT,
   "chartLabel" TEXT,
   "relativeX" REAL,
-  "relativeY" REAL
+  "relativeY" REAL,
+  "filterState" JSONB,
+  "jiraTicket" JSONB
 );</pre>
+                      </div>
                     </li>
                     <li>Enter your Project URL and API Key below</li>
                   </ol>
@@ -367,14 +547,43 @@ class Stickr {
                 
                 <div class="db-form-field">
                   <label class="db-form-label">Supabase API Key (anon public)</label>
-                  <input 
-                    type="password" 
-                    id="dc-supabase-key" 
-                    class="db-form-input" 
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  >
+                  <div style="position: relative;">
+                    <input 
+                      type="password" 
+                      id="dc-supabase-key" 
+                      class="db-form-input" 
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      style="padding-right: 2.5rem;"
+                    >
+                    <button type="button" class="dc-toggle-password" id="dc-toggle-supabase-key" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; color: #6B7280; transition: color 0.2s;" title="Show/Hide API Key">
+                      <svg id="dc-eye-icon-supabase-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <svg id="dc-eye-off-icon-supabase-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 
+                <div id="dc-db-loader" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #F3F4F6; border-radius: 6px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <div class="dc-loading-spinner" style="width: 16px; height: 16px; border: 2px solid #E5E7EB; border-top: 2px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                      <span style="font-size: 12px; color: #6B7280; font-weight: 500;">Testing connection...</span>
+                    </div>
+                    <button type="button" class="dc-copy-logs-btn" id="dc-copy-db-logs-btn-supabase" style="display: none; background: white; border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 11px; color: #6B7280; transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;" title="Copy logs">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      <span class="dc-copy-logs-text">Copy</span>
+                    </button>
+                  </div>
+                  <div id="dc-db-logs" style="font-size: 11px; color: #6B7280; line-height: 1.5; max-height: 120px; overflow-y: auto; font-family: 'Monaco', 'Courier New', monospace; background: white; padding: 0.5rem; border-radius: 4px; border: 1px solid #E5E7EB; white-space: pre-wrap; word-wrap: break-word; text-align: left; direction: ltr;"></div>
+                </div>
                 <p id="dc-db-error" style="color: #EF4444; font-size: 11px; margin-top: 0.5rem; display: none;"></p>
                 <p id="dc-db-success" style="color: #10B981; font-size: 11px; margin-top: 0.5rem; display: none;">✅ Connection successful!</p>
               </div>
@@ -383,13 +592,13 @@ class Stickr {
               <div id="form-mongodb" class="db-form" style="display: none;">
                 <div class="db-setup-guide">
                   <div class="db-setup-guide-title">📚 MongoDB Atlas Setup Steps:</div>
-                  <ol style="margin: 0; padding-left: 1.25rem; color: #78350F; line-height: 1.6; font-size: 12px;">
+                  <ol>
                     <li>Go to <a href="https://www.mongodb.com/cloud/atlas/register" target="_blank" style="color: #0066cc; font-weight: 500;">mongodb.com/cloud/atlas</a> and create a free account</li>
                     <li>Create a <strong>free M0 cluster</strong> (Shared tier)</li>
                     <li>Set up database access: <strong>Security → Database Access → Add New User</strong></li>
                     <li>Set up network access: <strong>Security → Network Access → Add IP Address → Allow Access from Anywhere (0.0.0.0/0)</strong></li>
                     <li>Enable Data API:
-                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem; font-size: 12px;">
+                      <ul>
                         <li>Go to <strong>Data API</strong> in left sidebar</li>
                         <li>Click <strong>"Enable the Data API"</strong></li>
                         <li>Copy the <strong>"URL Endpoint"</strong></li>
@@ -397,12 +606,55 @@ class Stickr {
                       </ul>
                     </li>
                     <li>Create database and collection:
-                      <ul style="margin-top: 0.25rem; padding-left: 1.25rem; font-size: 12px;">
+                      <ul>
                         <li>Go to <strong>Database → Browse Collections</strong></li>
                         <li>Click <strong>"Add My Own Data"</strong></li>
                         <li>Database Name: <code style="background: #FEFCE8; padding: 0.125rem 0.25rem; border-radius: 3px;">cognito</code></li>
                         <li>Collection Name: <code style="background: #FEFCE8; padding: 0.125rem 0.25rem; border-radius: 3px;">comments</code></li>
                       </ul>
+                    </li>
+                    <li>Run this MongoDB command to create the collection structure (or use MongoDB Compass/Shell):
+                      <div style="position: relative; margin-top: 0.75rem;">
+                        <button class="dc-copy-sql-btn" id="dc-copy-mongo-btn" title="Copy MongoDB command" style="position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(255, 255, 255, 0.9); border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.375rem 0.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; font-size: 11px; color: #6B7280; transition: all 0.2s; z-index: 10;">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                          <span class="dc-copy-text">Copy</span>
+                        </button>
+                        <pre id="dc-mongo-command">// MongoDB Shell Command
+// Run this in MongoDB Compass or MongoDB Shell after connecting to your cluster
+
+use cognito;
+
+db.createCollection("comments");
+
+// Create indexes for better performance
+db.comments.createIndex({ "pageId": 1 });
+db.comments.createIndex({ "chartHash": 1 });
+db.comments.createIndex({ "author": 1 });
+db.comments.createIndex({ "timestamp": -1 });
+
+// Sample document structure (collection is created automatically on first insert)
+// {
+//   "id": "string (unique)",
+//   "text": "string",
+//   "link": "string",
+//   "commentType": "string",
+//   "type": "string (bubble|page)",
+//   "timestamp": "string (ISO 8601)",
+//   "author": "string",
+//   "pageId": "string",
+//   "parentId": "string|null",
+//   "replies": [],
+//   "chartHash": "string",
+//   "chartLabel": "string",
+//   "relativeX": "number",
+//   "relativeY": "number",
+//   "filterState": { "from": "string", "to": "string", "timezone": "string" },
+//   "jiraTicket": { "key": "string", "url": "string" }
+// }</pre>
+                      </div>
                     </li>
                     <li>Enter your Data API URL, API Key, and Database Name below</li>
                   </ol>
@@ -420,12 +672,25 @@ class Stickr {
                 
                 <div class="db-form-field">
                   <label class="db-form-label">MongoDB API Key</label>
-                  <input 
-                    type="password" 
-                    id="dc-mongodb-key" 
-                    class="db-form-input" 
-                    placeholder="Your MongoDB Data API Key"
-                  >
+                  <div style="position: relative;">
+                    <input 
+                      type="password" 
+                      id="dc-mongodb-key" 
+                      class="db-form-input" 
+                      placeholder="Your MongoDB Data API Key"
+                      style="padding-right: 2.5rem;"
+                    >
+                    <button type="button" class="dc-toggle-password" id="dc-toggle-mongodb-key" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; color: #6B7280; transition: color 0.2s;" title="Show/Hide API Key">
+                      <svg id="dc-eye-icon-mongodb-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                      <svg id="dc-eye-off-icon-mongodb-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 
                 <div class="db-form-field">
@@ -439,6 +704,22 @@ class Stickr {
                   >
                 </div>
                 
+                <div id="dc-db-loader" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #F3F4F6; border-radius: 6px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <div class="dc-loading-spinner" style="width: 16px; height: 16px; border: 2px solid #E5E7EB; border-top: 2px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                      <span style="font-size: 12px; color: #6B7280; font-weight: 500;">Testing connection...</span>
+                    </div>
+                    <button type="button" class="dc-copy-logs-btn" id="dc-copy-db-logs-btn-mongo" style="display: none; background: white; border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 11px; color: #6B7280; transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;" title="Copy logs">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      <span class="dc-copy-logs-text">Copy</span>
+                    </button>
+                  </div>
+                  <div id="dc-db-logs" style="font-size: 11px; color: #6B7280; line-height: 1.5; max-height: 120px; overflow-y: auto; font-family: 'Monaco', 'Courier New', monospace; background: white; padding: 0.5rem; border-radius: 4px; border: 1px solid #E5E7EB; white-space: pre-wrap; word-wrap: break-word; text-align: left; direction: ltr;"></div>
+                </div>
                 <p id="dc-db-error" style="color: #EF4444; font-size: 11px; margin-top: 0.5rem; display: none;"></p>
                 <p id="dc-db-success" style="color: #10B981; font-size: 11px; margin-top: 0.5rem; display: none;">✅ Connection successful!</p>
               </div>
@@ -459,6 +740,146 @@ class Stickr {
         `;
         
         document.body.appendChild(dialog);
+        
+        // Copy SQL command button handler
+        const copySqlBtn = dialog.querySelector('#dc-copy-sql-btn');
+        if (copySqlBtn) {
+          copySqlBtn.addEventListener('click', async () => {
+            const sqlCommand = dialog.querySelector('#dc-sql-command');
+            if (sqlCommand) {
+              const sqlText = sqlCommand.textContent || sqlCommand.innerText;
+              try {
+                await navigator.clipboard.writeText(sqlText);
+                const copyText = copySqlBtn.querySelector('.dc-copy-text');
+                const originalText = copyText.textContent;
+                copyText.textContent = 'Copied!';
+                copySqlBtn.style.background = '#10B981';
+                copySqlBtn.style.color = 'white';
+                copySqlBtn.style.borderColor = '#10B981';
+                
+                setTimeout(() => {
+                  copyText.textContent = originalText;
+                  copySqlBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                  copySqlBtn.style.color = '#6B7280';
+                  copySqlBtn.style.borderColor = '#E5E7EB';
+                }, 2000);
+              } catch (err) {
+                console.error('Failed to copy SQL command:', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = sqlText;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  const copyText = copySqlBtn.querySelector('.dc-copy-text');
+                  const originalText = copyText.textContent;
+                  copyText.textContent = 'Copied!';
+                  copySqlBtn.style.background = '#10B981';
+                  copySqlBtn.style.color = 'white';
+                  copySqlBtn.style.borderColor = '#10B981';
+                  
+                  setTimeout(() => {
+                    copyText.textContent = originalText;
+                    copySqlBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                    copySqlBtn.style.color = '#6B7280';
+                    copySqlBtn.style.borderColor = '#E5E7EB';
+                  }, 2000);
+                } catch (fallbackErr) {
+                  console.error('Fallback copy failed:', fallbackErr);
+                  alert('Failed to copy. Please select and copy manually.');
+                }
+                document.body.removeChild(textArea);
+              }
+            }
+          });
+        }
+        
+        // Copy MongoDB command button handler
+        const copyMongoBtn = dialog.querySelector('#dc-copy-mongo-btn');
+        if (copyMongoBtn) {
+          copyMongoBtn.addEventListener('click', async () => {
+            const mongoCommand = dialog.querySelector('#dc-mongo-command');
+            if (mongoCommand) {
+              const mongoText = mongoCommand.textContent || mongoCommand.innerText;
+              try {
+                await navigator.clipboard.writeText(mongoText);
+                const copyText = copyMongoBtn.querySelector('.dc-copy-text');
+                const originalText = copyText.textContent;
+                copyText.textContent = 'Copied!';
+                copyMongoBtn.style.background = '#10B981';
+                copyMongoBtn.style.color = 'white';
+                copyMongoBtn.style.borderColor = '#10B981';
+                
+                setTimeout(() => {
+                  copyText.textContent = originalText;
+                  copyMongoBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                  copyMongoBtn.style.color = '#6B7280';
+                  copyMongoBtn.style.borderColor = '#E5E7EB';
+                }, 2000);
+              } catch (err) {
+                console.error('Failed to copy MongoDB command:', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = mongoText;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  const copyText = copyMongoBtn.querySelector('.dc-copy-text');
+                  const originalText = copyText.textContent;
+                  copyText.textContent = 'Copied!';
+                  copyMongoBtn.style.background = '#10B981';
+                  copyMongoBtn.style.color = 'white';
+                  copyMongoBtn.style.borderColor = '#10B981';
+                  
+                  setTimeout(() => {
+                    copyText.textContent = originalText;
+                    copyMongoBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                    copyMongoBtn.style.color = '#6B7280';
+                    copyMongoBtn.style.borderColor = '#E5E7EB';
+                  }, 2000);
+                } catch (fallbackErr) {
+                  console.error('Fallback copy failed:', fallbackErr);
+                  alert('Failed to copy. Please select and copy manually.');
+                }
+                document.body.removeChild(textArea);
+              }
+            }
+          });
+        }
+        
+        // Password toggle handlers for database dialog
+        const setupPasswordToggle = (toggleBtnId, inputId, eyeIconId, eyeOffIconId) => {
+          const toggleBtn = dialog.querySelector(toggleBtnId);
+          if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+              const input = dialog.querySelector(inputId);
+              const eyeIcon = dialog.querySelector(eyeIconId);
+              const eyeOffIcon = dialog.querySelector(eyeOffIconId);
+              
+              if (input && eyeIcon && eyeOffIcon) {
+                if (input.type === 'password') {
+                  input.type = 'text';
+                  eyeIcon.style.display = 'none';
+                  eyeOffIcon.style.display = 'block';
+                } else {
+                  input.type = 'password';
+                  eyeIcon.style.display = 'block';
+                  eyeOffIcon.style.display = 'none';
+                }
+              }
+            });
+          }
+        };
+        
+        // Setup password toggles for Supabase and MongoDB
+        setupPasswordToggle('#dc-toggle-supabase-key', '#dc-supabase-key', '#dc-eye-icon-supabase-key', '#dc-eye-off-icon-supabase-key');
+        setupPasswordToggle('#dc-toggle-mongodb-key', '#dc-mongodb-key', '#dc-eye-icon-mongodb-key', '#dc-eye-off-icon-mongodb-key');
         
         // Local Storage option click handler
         const localStorageOption = document.getElementById('dc-local-storage-option');
@@ -541,6 +962,8 @@ class Stickr {
           
           const errorMsg = dialog.querySelector(`#form-${selectedProvider} #dc-db-error`);
           const successMsg = dialog.querySelector(`#form-${selectedProvider} #dc-db-success`);
+          const loader = dialog.querySelector(`#form-${selectedProvider} #dc-db-loader`);
+          const logs = dialog.querySelector(`#form-${selectedProvider} #dc-db-logs`);
           
           let config = {};
           
@@ -571,14 +994,97 @@ class Stickr {
             config = { mongoUrl: url, mongoApiKey: key, mongoDatabase: database };
           }
           
+          // Reset UI
           testBtn.textContent = '⏳ Testing...';
           testBtn.disabled = true;
+          testBtn.style.background = '';
+          errorMsg.style.display = 'none';
+          successMsg.style.display = 'none';
+          loader.style.display = 'block';
+          logs.textContent = '';
+          
+          // Get copy button - different IDs for Supabase and MongoDB
+          const copyBtn = dialog.querySelector(`#form-${selectedProvider} .dc-copy-logs-btn`);
+          if (copyBtn) {
+            copyBtn.style.display = 'none';
+          }
+          
+          // Helper function to add log
+          const addLog = (message, type = 'info') => {
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : '🔍';
+            const logLine = `[${timestamp}] ${icon} ${message}`;
+            
+            // Append to textContent for easy copying
+            if (logs.textContent) {
+              logs.textContent += '\n' + logLine;
+            } else {
+              logs.textContent = logLine;
+            }
+            
+            logs.scrollTop = logs.scrollHeight;
+            
+            // Show copy button when logs are present
+            if (copyBtn && logs.textContent.trim()) {
+              copyBtn.style.display = 'flex';
+            }
+          };
+          
+          // Copy button functionality
+          if (copyBtn) {
+            copyBtn.onclick = async () => {
+              try {
+                const logText = logs.textContent || '';
+                if (!logText.trim()) {
+                  return;
+                }
+                
+                await navigator.clipboard.writeText(logText);
+                
+                // Visual feedback
+                const originalText = copyBtn.querySelector('.dc-copy-logs-text').textContent;
+                copyBtn.querySelector('.dc-copy-logs-text').textContent = 'Copied!';
+                copyBtn.style.background = '#10B981';
+                copyBtn.style.borderColor = '#10B981';
+                copyBtn.style.color = 'white';
+                
+                setTimeout(() => {
+                  copyBtn.querySelector('.dc-copy-logs-text').textContent = originalText;
+                  copyBtn.style.background = 'white';
+                  copyBtn.style.borderColor = '#E5E7EB';
+                  copyBtn.style.color = '#6B7280';
+                }, 2000);
+              } catch (err) {
+                console.error('Failed to copy logs:', err);
+              }
+            };
+          }
+          
+          // Set up timeout (increased to 25 seconds to allow for network latency)
+          const TIMEOUT_MS = 25000; // 25 seconds
+          let timeoutId;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              addLog('Connection timeout - request may still be processing on server', 'error');
+              reject(new Error('Connection timeout after 25 seconds. The request may have reached the server but the response took too long. Please check your network connection.'));
+            }, TIMEOUT_MS);
+          });
           
           try {
-            const isValid = await this.db.testConnection(selectedProvider, config);
+            addLog(`Starting ${selectedProvider === 'supabase' ? 'Supabase' : 'MongoDB'} connection test...`);
+            addLog(`Connecting to: ${selectedProvider === 'supabase' ? config.supabaseUrl : config.mongoUrl}`);
+            
+            // Race between timeout and connection test
+            const testPromise = this.db.testConnection(selectedProvider, config, addLog);
+            const isValid = await Promise.race([testPromise, timeoutPromise]);
+            
+            clearTimeout(timeoutId);
+            
             console.log('🔍 Database test result:', isValid);
             
             if (isValid) {
+              addLog('Connection successful!', 'success');
+              loader.style.display = 'none'; // Stop loader immediately on success
               successMsg.textContent = '✅ Database connection successful!';
               successMsg.style.display = 'block';
               errorMsg.style.display = 'none';
@@ -586,23 +1092,31 @@ class Stickr {
               saveBtn.disabled = false;
               testBtn.textContent = '✅ Connected';
               testBtn.style.background = '#10B981';
+              testBtn.disabled = false;
             } else {
-              errorMsg.textContent = '❌ Connection failed. Please check your credentials.';
+              addLog('Connection failed. Please check your credentials.', 'error');
+              loader.style.display = 'none'; // Stop loader immediately on failure
+              errorMsg.textContent = '❌ Connection failed. Please check your credentials and try again.';
               errorMsg.style.display = 'block';
               successMsg.style.display = 'none';
               connectionValid = false;
               saveBtn.disabled = true;
               testBtn.textContent = '🔍 Test Connection';
+              testBtn.style.background = '';
               testBtn.disabled = false;
             }
           } catch (error) {
+            clearTimeout(timeoutId);
             console.error('🔍 Database test error:', error);
-            errorMsg.textContent = `❌ Connection failed: ${error.message}`;
+            addLog(`Error: ${error.message}`, 'error');
+            loader.style.display = 'none'; // Stop loader immediately on error/timeout
+            errorMsg.textContent = `❌ Connection failed: ${error.message || 'Unknown error'}`;
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             connectionValid = false;
             saveBtn.disabled = true;
             testBtn.textContent = '🔍 Test Connection';
+            testBtn.style.background = '';
             testBtn.disabled = false;
           }
         });
@@ -684,13 +1198,26 @@ class Stickr {
                   API Token 
                   <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="font-size: 11px; color: #3B82F6; text-decoration: none;">Get Token</a>
                 </label>
-                <input 
-                  type="password" 
-                  id="dc-jira-token" 
-                  class="dc-form-input" 
-                  placeholder="Your Jira API Token"
-                  value="${this.jira.jiraApiToken || ''}"
-                >
+                <div style="position: relative;">
+                  <input 
+                    type="password" 
+                    id="dc-jira-token" 
+                    class="dc-form-input" 
+                    placeholder="Your Jira API Token"
+                    value="${this.jira.jiraApiToken || ''}"
+                    style="padding-right: 2.5rem;"
+                  >
+                  <button type="button" class="dc-toggle-password" id="dc-toggle-jira-token" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; color: #6B7280; transition: color 0.2s;" title="Show/Hide API Token">
+                    <svg id="dc-eye-icon-jira-token" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <svg id="dc-eye-off-icon-jira-token" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  </button>
+                </div>
               </div>
               
               <div class="dc-info-box" style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; font-size: 11px; line-height: 1.4;">
@@ -706,8 +1233,24 @@ class Stickr {
                 </div>
               </div>
               
+              <div id="dc-jira-loader" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #F3F4F6; border-radius: 6px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="dc-loading-spinner" style="width: 16px; height: 16px; border: 2px solid #E5E7EB; border-top: 2px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <span style="font-size: 12px; color: #6B7280; font-weight: 500;">Testing connection...</span>
+                  </div>
+                  <button type="button" class="dc-copy-logs-btn" id="dc-copy-jira-logs-btn" style="display: none; background: white; border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 11px; color: #6B7280; transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;" title="Copy logs">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span class="dc-copy-logs-text">Copy</span>
+                  </button>
+                </div>
+                <div id="dc-jira-logs" style="font-size: 11px; color: #6B7280; line-height: 1.5; max-height: 120px; overflow-y: auto; font-family: 'Monaco', 'Courier New', monospace; background: white; padding: 0.5rem; border-radius: 4px; border: 1px solid #E5E7EB; white-space: pre-wrap; word-wrap: break-word; text-align: left; direction: ltr;"></div>
+              </div>
               <p id="dc-jira-error" style="color: #EF4444; font-size: 11px; margin-top: 0.75rem; display: none;"></p>
-              <p id="dc-jira-success" style="color: #10B981; font-size: 11px; margin-top: 0.75rem; display: none;"></p>
+              <p id="dc-jira-success" style="color: #10B981; font-size: 11px; margin-top: 0.75rem; display: none;">✅ Connection successful!</p>
             </div>
             <div class="dc-dialog-footer" style="padding: 0.75rem 1.25rem 1rem; display: flex; gap: 0.5rem; border-top: 1px solid #F3F4F6;">
               <button class="dc-btn dc-btn-secondary" id="dc-jira-close" style="flex: 1; padding: 0.5rem; font-size: 13px;">
@@ -724,6 +1267,28 @@ class Stickr {
         `;
         
         document.body.appendChild(dialog);
+        
+        // Password toggle handler for JIRA token
+        const jiraToggleBtn = dialog.querySelector('#dc-toggle-jira-token');
+        if (jiraToggleBtn) {
+          jiraToggleBtn.addEventListener('click', () => {
+            const tokenInput = document.getElementById('dc-jira-token');
+            const eyeIcon = dialog.querySelector('#dc-eye-icon-jira-token');
+            const eyeOffIcon = dialog.querySelector('#dc-eye-off-icon-jira-token');
+            
+            if (tokenInput && eyeIcon && eyeOffIcon) {
+              if (tokenInput.type === 'password') {
+                tokenInput.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+              } else {
+                tokenInput.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+              }
+            }
+          });
+        }
         
         const urlInput = document.getElementById('dc-jira-url');
         const emailInput = document.getElementById('dc-jira-email');
@@ -758,8 +1323,79 @@ class Stickr {
             return;
           }
           
+          const loader = document.getElementById('dc-jira-loader');
+          const logs = document.getElementById('dc-jira-logs');
+          const copyBtn = document.getElementById('dc-copy-jira-logs-btn');
+          
+          // Reset UI
           testBtn.textContent = '⏳ Testing...';
           testBtn.disabled = true;
+          testBtn.style.background = '';
+          errorMsg.style.display = 'none';
+          successMsg.style.display = 'none';
+          loader.style.display = 'block';
+          logs.textContent = '';
+          
+          if (copyBtn) {
+            copyBtn.style.display = 'none';
+          }
+          
+          // Add log helper
+          const addLog = (message, type = 'info') => {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '🔍';
+            const logLine = `[${timestamp}] ${prefix} ${message}`;
+            
+            // Append to textContent for easy copying
+            if (logs.textContent) {
+              logs.textContent += '\n' + logLine;
+            } else {
+              logs.textContent = logLine;
+            }
+            
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[JIRA-TEST] ${message}`);
+            
+            // Show copy button when logs are present
+            if (copyBtn && logs.textContent.trim()) {
+              copyBtn.style.display = 'flex';
+            }
+          };
+          
+          // Copy button functionality
+          if (copyBtn) {
+            copyBtn.onclick = async () => {
+              try {
+                const logText = logs.textContent || '';
+                if (!logText.trim()) {
+                  return;
+                }
+                
+                await navigator.clipboard.writeText(logText);
+                
+                // Visual feedback
+                const originalText = copyBtn.querySelector('.dc-copy-logs-text').textContent;
+                copyBtn.querySelector('.dc-copy-logs-text').textContent = 'Copied!';
+                copyBtn.style.background = '#10B981';
+                copyBtn.style.borderColor = '#10B981';
+                copyBtn.style.color = 'white';
+                
+                setTimeout(() => {
+                  copyBtn.querySelector('.dc-copy-logs-text').textContent = originalText;
+                  copyBtn.style.background = 'white';
+                  copyBtn.style.borderColor = '#E5E7EB';
+                  copyBtn.style.color = '#6B7280';
+                }, 2000);
+              } catch (err) {
+                console.error('Failed to copy logs:', err);
+              }
+            };
+          }
+          
+          addLog('Starting Jira connection test...');
+          addLog(`Jira URL: ${url}`);
+          addLog(`Email: ${email}`);
+          addLog(`API Token: ${token.substring(0, 10)}...`);
           
           // Temporarily set credentials for testing
           this.jira.jiraUrl = url;
@@ -767,10 +1403,12 @@ class Stickr {
           this.jira.jiraApiToken = token;
           
           try {
-            const result = await this.jira.testConnection();
+            const result = await this.jira.testConnection(addLog);
             console.log('🔍 Jira test result:', result);
             
             if (result.success) {
+              addLog(`Connection successful! User: ${result.user}`, 'success');
+              loader.style.display = 'none'; // Stop loader on success
               successMsg.textContent = `✅ Connected as ${result.user}`;
               successMsg.style.display = 'block';
               errorMsg.style.display = 'none';
@@ -778,24 +1416,36 @@ class Stickr {
               saveBtn.disabled = false;
               testBtn.textContent = '✅ Connected';
               testBtn.style.background = '#10B981';
+              testBtn.disabled = false;
             } else {
+              addLog(`Connection failed: ${result.error}`, 'error');
+              loader.style.display = 'none'; // Stop loader on failure
               errorMsg.textContent = `❌ ${result.error}`;
               errorMsg.style.display = 'block';
               successMsg.style.display = 'none';
               connectionValid = false;
               saveBtn.disabled = true;
-              testBtn.textContent = '🔍 Test Connection';
+              testBtn.textContent = '🔍 Test';
+              testBtn.style.background = '';
               testBtn.disabled = false;
             }
           } catch (error) {
+            addLog(`Error: ${error.message}`, 'error');
             console.error('🔍 Jira test error:', error);
+            loader.style.display = 'none'; // Stop loader on error
             errorMsg.textContent = `❌ Connection failed: ${error.message}`;
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             connectionValid = false;
             saveBtn.disabled = true;
-            testBtn.textContent = '🔍 Test Connection';
+            testBtn.textContent = '🔍 Test';
+            testBtn.style.background = '';
             testBtn.disabled = false;
+          } finally {
+            // Keep loader visible to show logs
+            setTimeout(() => {
+              // Optionally hide loader after a delay, or keep it visible
+            }, 100);
           }
         });
         
@@ -875,13 +1525,26 @@ class Stickr {
               
               <div class="dc-form-group">
                 <label class="dc-form-label">API Key</label>
-                <input 
-                  type="password" 
-                  id="dc-ai-key" 
-                  class="dc-form-input" 
-                  placeholder="Enter your API key"
-                  value="${this.ai.apiKey || ''}"
-                >
+                <div style="position: relative;">
+                  <input 
+                    type="password" 
+                    id="dc-ai-key" 
+                    class="dc-form-input" 
+                    placeholder="Enter your API key"
+                    value="${this.ai.apiKey || ''}"
+                    style="padding-right: 2.5rem;"
+                  >
+                  <button type="button" class="dc-toggle-password" id="dc-toggle-ai-key" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center; justify-content: center; color: #6B7280; transition: color 0.2s;" title="Show/Hide API Key">
+                    <svg id="dc-eye-icon-ai-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <svg id="dc-eye-off-icon-ai-key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  </button>
+                </div>
               </div>
               
               <div class="dc-info-box" style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; font-size: 11px; line-height: 1.4;">
@@ -909,8 +1572,24 @@ class Stickr {
                 </div>
               </div>
               
+              <div id="dc-ai-loader" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #F3F4F6; border-radius: 6px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="dc-loading-spinner" style="width: 16px; height: 16px; border: 2px solid #E5E7EB; border-top: 2px solid #667eea; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <span style="font-size: 12px; color: #6B7280; font-weight: 500;">Testing connection...</span>
+                  </div>
+                  <button type="button" class="dc-copy-logs-btn" id="dc-copy-ai-logs-btn" style="display: none; background: white; border: 1px solid #E5E7EB; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 11px; color: #6B7280; transition: all 0.2s; display: flex; align-items: center; gap: 0.25rem;" title="Copy logs">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span class="dc-copy-logs-text">Copy</span>
+                  </button>
+                </div>
+                <div id="dc-ai-logs" style="font-size: 11px; color: #6B7280; line-height: 1.5; max-height: 120px; overflow-y: auto; font-family: 'Monaco', 'Courier New', monospace; background: white; padding: 0.5rem; border-radius: 4px; border: 1px solid #E5E7EB; white-space: pre-wrap; word-wrap: break-word; text-align: left; direction: ltr;"></div>
+              </div>
               <p id="dc-ai-error" style="color: #EF4444; font-size: 11px; margin-top: 0.75rem; display: none;"></p>
-              <p id="dc-ai-success" style="color: #10B981; font-size: 11px; margin-top: 0.75rem; display: none;"></p>
+              <p id="dc-ai-success" style="color: #10B981; font-size: 11px; margin-top: 0.75rem; display: none;">✅ Connection successful!</p>
             </div>
             <div class="dc-dialog-footer" style="padding: 0.75rem 1.25rem 1rem; display: flex; gap: 0.5rem; border-top: 1px solid #F3F4F6;">
               <button class="dc-btn dc-btn-secondary" id="dc-ai-close" style="flex: 1; padding: 0.5rem; font-size: 13px;">
@@ -927,6 +1606,28 @@ class Stickr {
         `;
         
         document.body.appendChild(dialog);
+        
+        // Password toggle handler for AI API key
+        const aiToggleBtn = dialog.querySelector('#dc-toggle-ai-key');
+        if (aiToggleBtn) {
+          aiToggleBtn.addEventListener('click', () => {
+            const keyInput = document.getElementById('dc-ai-key');
+            const eyeIcon = dialog.querySelector('#dc-eye-icon-ai-key');
+            const eyeOffIcon = dialog.querySelector('#dc-eye-off-icon-ai-key');
+            
+            if (keyInput && eyeIcon && eyeOffIcon) {
+              if (keyInput.type === 'password') {
+                keyInput.type = 'text';
+                eyeIcon.style.display = 'none';
+                eyeOffIcon.style.display = 'block';
+              } else {
+                keyInput.type = 'password';
+                eyeIcon.style.display = 'block';
+                eyeOffIcon.style.display = 'none';
+              }
+            }
+          });
+        }
         
         const providerSelect = document.getElementById('dc-ai-provider');
         const modelSelect = document.getElementById('dc-ai-model');
@@ -958,10 +1659,45 @@ class Stickr {
           ]
         };
 
+        // Simple function to ensure select displays its value
+        const updateSelectDisplay = (selectElement) => {
+          if (!selectElement) return;
+          
+          const value = selectElement.value;
+          if (value) {
+            // Find and set the correct option as selected
+            const optionIndex = Array.from(selectElement.options).findIndex(opt => opt.value === value);
+            if (optionIndex >= 0) {
+              selectElement.selectedIndex = optionIndex;
+              // Ensure the option is marked as selected
+              selectElement.options[optionIndex].selected = true;
+            }
+            // Force style update - use darker color for visibility
+            selectElement.style.color = '#1F2937';
+            selectElement.style.fontWeight = '500';
+            // Force browser reflow
+            void selectElement.offsetWidth;
+          } else {
+            selectElement.style.color = '#9CA3AF';
+            selectElement.style.fontWeight = '400';
+          }
+        };
+        
         // Handle provider selection
-        providerSelect.addEventListener('change', () => {
+        providerSelect.addEventListener('change', (e) => {
           const selectedProvider = providerSelect.value;
+          
+          // Force the display to update immediately
+          if (selectedProvider) {
+            providerSelect.selectedIndex = Array.from(providerSelect.options).findIndex(opt => opt.value === selectedProvider);
+            providerSelect.style.color = '#1F2937';
+            providerSelect.style.fontWeight = '500';
+          }
+          
+          // Clear and reset model select
           modelSelect.innerHTML = '<option value="">Select Model</option>';
+          modelSelect.value = '';
+          modelSelect.style.color = '#9CA3AF';
           
           if (selectedProvider && modelOptions[selectedProvider]) {
             modelSelection.style.display = 'block';
@@ -975,22 +1711,64 @@ class Stickr {
             modelSelection.style.display = 'none';
           }
         });
+        
+        // Ensure selected values are visible when model dropdown changes
+        modelSelect.addEventListener('change', (e) => {
+          const selectedModel = modelSelect.value;
+          if (selectedModel) {
+            modelSelect.selectedIndex = Array.from(modelSelect.options).findIndex(opt => opt.value === selectedModel);
+            modelSelect.style.color = '#1F2937';
+            modelSelect.style.fontWeight = '500';
+          }
+        });
+        
+        // Initialize display for selects - ensure values are visible
+        const initSelects = () => {
+          if (providerSelect && providerSelect.value) {
+            updateSelectDisplay(providerSelect);
+          }
+          if (modelSelect && modelSelect.value) {
+            updateSelectDisplay(modelSelect);
+          }
+        };
+        
+        // Call immediately and after a short delay
+        initSelects();
+        setTimeout(initSelects, 50);
+        setTimeout(initSelects, 100);
 
         // Initialize with current provider if configured
         if (this.ai.isConfigured) {
           connectionValid = true;
           saveBtn.disabled = false;
           if (this.ai.provider && modelOptions[this.ai.provider]) {
+            // Set provider select value and force display
+            providerSelect.value = this.ai.provider;
+            const providerIndex = Array.from(providerSelect.options).findIndex(opt => opt.value === this.ai.provider);
+            if (providerIndex >= 0) {
+              providerSelect.selectedIndex = providerIndex;
+              providerSelect.style.color = '#1F2937';
+              providerSelect.style.fontWeight = '500';
+            }
+            
             modelSelection.style.display = 'block';
             modelOptions[this.ai.provider].forEach(model => {
               const option = document.createElement('option');
               option.value = model.value;
               option.textContent = model.text;
-              if (this.ai.model === model.value) {
-                option.selected = true;
-              }
               modelSelect.appendChild(option);
             });
+            
+            // Set model select value and force display
+            if (this.ai.model) {
+              modelSelect.value = this.ai.model;
+              const modelIndex = Array.from(modelSelect.options).findIndex(opt => opt.value === this.ai.model);
+              if (modelIndex >= 0) {
+                modelSelect.selectedIndex = modelIndex;
+                modelSelect.style.color = '#1F2937';
+                modelSelect.style.fontWeight = '500';
+              }
+            }
           }
         }
         
@@ -1011,32 +1789,122 @@ class Stickr {
             return;
           }
           
+          const loader = document.getElementById('dc-ai-loader');
+          const logs = document.getElementById('dc-ai-logs');
+          const copyBtn = document.getElementById('dc-copy-ai-logs-btn');
+          
+          // Reset UI
           testBtn.textContent = '⏳ Testing...';
           testBtn.disabled = true;
+          testBtn.style.background = '';
+          errorMsg.style.display = 'none';
+          successMsg.style.display = 'none';
+          loader.style.display = 'block';
+          logs.textContent = '';
+          
+          if (copyBtn) {
+            copyBtn.style.display = 'none';
+          }
+          
+          // Add log helper
+          const addLog = (message, type = 'info') => {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '🔍';
+            const logLine = `[${timestamp}] ${prefix} ${message}`;
+            
+            // Append to textContent for easy copying
+            if (logs.textContent) {
+              logs.textContent += '\n' + logLine;
+            } else {
+              logs.textContent = logLine;
+            }
+            
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[AI-TEST] ${message}`);
+            
+            // Show copy button when logs are present
+            if (copyBtn && logs.textContent.trim()) {
+              copyBtn.style.display = 'flex';
+            }
+          };
+          
+          // Copy button functionality
+          if (copyBtn) {
+            copyBtn.onclick = async () => {
+              try {
+                const logText = logs.textContent || '';
+                if (!logText.trim()) {
+                  return;
+                }
+                
+                await navigator.clipboard.writeText(logText);
+                
+                // Visual feedback
+                const originalText = copyBtn.querySelector('.dc-copy-logs-text').textContent;
+                copyBtn.querySelector('.dc-copy-logs-text').textContent = 'Copied!';
+                copyBtn.style.background = '#10B981';
+                copyBtn.style.borderColor = '#10B981';
+                copyBtn.style.color = 'white';
+                
+                setTimeout(() => {
+                  copyBtn.querySelector('.dc-copy-logs-text').textContent = originalText;
+                  copyBtn.style.background = 'white';
+                  copyBtn.style.borderColor = '#E5E7EB';
+                  copyBtn.style.color = '#6B7280';
+                }, 2000);
+              } catch (err) {
+                console.error('Failed to copy logs:', err);
+              }
+            };
+          }
+          
+          addLog(`Starting ${provider.toUpperCase()} connection test...`);
+          addLog(`Provider: ${provider}`);
+          addLog(`Model: ${model}`);
+          addLog(`API Key: ${key.substring(0, 10)}...`);
           
           // Temporarily set for testing
           this.ai.provider = provider;
           this.ai.model = model;
           this.ai.apiKey = key;
           
-          const isValid = await this.ai.testConnection();
-          
-          if (isValid) {
-            const modelText = modelOptions[provider].find(m => m.value === model)?.text || model;
-            successMsg.textContent = `✅ ${provider.charAt(0).toUpperCase() + provider.slice(1)} (${modelText}) connected successfully!`;
-            successMsg.style.display = 'block';
-            errorMsg.style.display = 'none';
-            connectionValid = true;
-            saveBtn.disabled = false;
-            testBtn.textContent = '✅ Connected';
-            testBtn.style.background = '#10B981';
-          } else {
-            errorMsg.textContent = '❌ Connection failed. Check your API key.';
+          try {
+            const isValid = await this.ai.testConnection(addLog);
+            
+            if (isValid) {
+              const modelText = modelOptions[provider].find(m => m.value === model)?.text || model;
+              addLog(`Connection successful!`, 'success');
+              loader.style.display = 'none'; // Stop loader on success
+              successMsg.textContent = `✅ ${provider.charAt(0).toUpperCase() + provider.slice(1)} (${modelText}) connected successfully!`;
+              successMsg.style.display = 'block';
+              errorMsg.style.display = 'none';
+              connectionValid = true;
+              saveBtn.disabled = false;
+              testBtn.textContent = '✅ Connected';
+              testBtn.style.background = '#10B981';
+              testBtn.disabled = false;
+            } else {
+              addLog(`Connection failed. Check your API key.`, 'error');
+              loader.style.display = 'none'; // Stop loader on failure
+              errorMsg.textContent = '❌ Connection failed. Check your API key.';
+              errorMsg.style.display = 'block';
+              successMsg.style.display = 'none';
+              connectionValid = false;
+              saveBtn.disabled = true;
+              testBtn.textContent = '🔍 Test';
+              testBtn.style.background = '';
+              testBtn.disabled = false;
+            }
+          } catch (error) {
+            addLog(`Error: ${error.message}`, 'error');
+            loader.style.display = 'none'; // Stop loader on error
+            errorMsg.textContent = `❌ Error: ${error.message}`;
             errorMsg.style.display = 'block';
             successMsg.style.display = 'none';
             connectionValid = false;
             saveBtn.disabled = true;
             testBtn.textContent = '🔍 Test';
+            testBtn.style.background = '';
             testBtn.disabled = false;
           }
         });
@@ -1505,7 +2373,7 @@ class Stickr {
                 </label>
               </div>
               <select id="dc-comment-filter" class="dc-filter-select">
-                <option value="all">📋 All</option>
+                <option value="all" selected>📋 All</option>
                 <option value="bubble">📍 Bubbles</option>
                 <option value="page">📝 Notes</option>
               </select>
@@ -1528,7 +2396,7 @@ class Stickr {
           <textarea id="dc-quick-note" placeholder="Add a quick note..."></textarea>
           <div class="dc-sidebar-input-controls">
             <select id="dc-note-type">
-              <option value="comment">💬 Comment</option>
+              <option value="comment" selected>💬 Comment</option>
               <option value="note">📝 Note</option>
               <option value="rca">🔍 RCA</option>
               <option value="reference">📚 Reference</option>
@@ -1540,6 +2408,9 @@ class Stickr {
       
       document.body.appendChild(sidebar);
       this.sidebar = sidebar;
+      
+      // Assert visibility immediately after injection
+      this.ensureSidebarUIVisibility();
       
       // Create expand button element
       this.expandButton = document.createElement('div');
@@ -1689,20 +2560,24 @@ class Stickr {
       });
   
       // Listen for storage changes (multi-user sync)
-      chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'sync' && changes.comments) {
-          this.comments = changes.comments.newValue || [];
-          this.renderComments();
-          this.renderBubbles();
-        }
-      });
+      if (this.isExtensionContextValid()) {
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+          if (namespace === 'sync' && changes.comments) {
+            this.comments = changes.comments.newValue || [];
+            this.renderComments();
+            this.renderBubbles();
+          }
+        });
+      }
   
       // Listen for messages from popup
-      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === 'toggleSidebar') {
-          this.toggleSidebar();
-        }
-      });
+      if (this.isExtensionContextValid()) {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+          if (request.action === 'toggleSidebar') {
+            this.toggleSidebar();
+          }
+        });
+      }
       
       // Listen for URL changes (for SPAs like Grafana)
       let lastUrl = location.href;
@@ -2035,7 +2910,7 @@ class Stickr {
   • Link to related document"></textarea>
             <input type="text" class="dc-link-input" placeholder="🔗 Add reference link (optional)">
             <select class="dc-type-select">
-              <option value="comment">💬 Comment</option>
+              <option value="comment" selected>💬 Comment</option>
               <option value="note">📝 Note</option>
               <option value="rca">🔍 RCA (Root Cause Analysis)</option>
               <option value="reference">📚 Reference</option>
@@ -2057,6 +2932,14 @@ class Stickr {
       const textarea = dialog.querySelector('.dc-comment-input');
       const linkInput = dialog.querySelector('.dc-link-input');
       const typeSelect = dialog.querySelector('.dc-type-select');
+      
+      // Ensure default value is selected and visible
+      if (typeSelect) {
+        typeSelect.value = 'comment'; // Set default value
+        // Force display update
+        typeSelect.style.color = '#1F2937';
+        typeSelect.style.fontWeight = '500';
+      }
       
       textarea.focus();
       
@@ -2112,13 +2995,15 @@ class Stickr {
     }
   
     // Show toast notification
-    showToast(message, type = 'success') {
+    showToast(message, type = 'success', duration = 3000) {
       const toast = document.createElement('div');
       toast.className = 'dc-toast';
       if (type === 'error') {
         toast.style.background = '#EF4444 !important';
       } else if (type === 'info') {
         toast.style.background = '#3B82F6 !important';
+      } else if (type === 'warning') {
+        toast.style.background = '#F59E0B !important';
       }
       toast.textContent = message;
       document.body.appendChild(toast);
@@ -2127,7 +3012,7 @@ class Stickr {
       setTimeout(() => {
         toast.classList.remove('dc-toast-show');
         setTimeout(() => toast.remove(), 300);
-      }, 3000);
+      }, duration);
     }
   
     // Show reply dialog
@@ -2237,7 +3122,7 @@ class Stickr {
       } else {
         // Fallback to local storage
         this.comments.push(comment);
-      await chrome.storage.sync.set({ comments: this.comments });
+      await this.safeChromeStorage(() => chrome.storage.sync.set({ comments: this.comments }));
         console.log('Comment saved to local storage');
       }
       
@@ -2259,8 +3144,8 @@ class Stickr {
         console.log('Comments with Jira tickets:', commentsWithJira.length, commentsWithJira);
       } else {
         // Fallback to local storage
-      const result = await chrome.storage.sync.get('comments');
-      this.comments = result.comments || [];
+      const result = await this.safeChromeStorage(() => chrome.storage.sync.get('comments'));
+      this.comments = result ? (result.comments || []) : [];
         console.log('Loaded comments from local storage:', this.comments.length);
         // Debug: Check for Jira tickets
         const commentsWithJira = this.comments.filter(c => c.jiraTicket);
@@ -2269,24 +3154,31 @@ class Stickr {
       
       this.renderComments();
       this.renderBubbles();
+      // After rendering, re-assert UI visibility to counter host CSS changes
+      this.ensureSidebarUIVisibility();
     }
   
     // Render comments in sidebar
     renderComments() {
       const container = document.getElementById('dc-comments-list');
-      let pageComments = this.comments.filter(c => c.pageId === this.currentPageId);
+      if (!container) return;
       
-      // Apply filter
+      // Filter comments by current page and filter type
+      let pageComments = (this.comments || []).filter(c => c.pageId === this.currentPageId);
+      
+      // Apply filter (all, bubble, page)
       if (this.currentFilter === 'bubble') {
         pageComments = pageComments.filter(c => c.type === 'bubble');
       } else if (this.currentFilter === 'page') {
         pageComments = pageComments.filter(c => c.type === 'page');
       }
+      // 'all' shows everything, no additional filtering needed
       
-      if (pageComments.length === 0) {
-        const filterText = this.currentFilter === 'bubble' ? 'bubble comments' : 
-                          this.currentFilter === 'page' ? 'page notes' : 'comments';
-        container.innerHTML = `<p class="dc-empty-state">No ${filterText} yet. Click above to add one!</p>`;
+      // If no comments, show empty state
+      if (!pageComments || pageComments.length === 0) {
+        container.innerHTML = `<div class="dc-empty-state">No comments yet. Click above to add one!</div>`;
+        // Ensure controls are visible even when empty
+        this.ensureSidebarUIVisibility();
         return;
       }
       
@@ -2336,7 +3228,7 @@ class Stickr {
               ${filterBadge}
           <div class="dc-comment-text">${this.escapeHtml(comment.text)}</div>
           ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-comment-link" target="_blank">🔗 View Reference</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 14px; height: 14px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 14px; height: 14px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 12px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
               ${comment.jiraTicket ? console.log('🔍 Rendering Jira ticket for comment:', comment.id, 'jiraTicket:', comment.jiraTicket, 'url:', comment.jiraTicket.url, 'key:', comment.jiraTicket.key) : ''}
           <div class="dc-comment-footer">
             <span class="dc-comment-author">👤 ${this.escapeHtml(comment.author)}</span>
@@ -2354,6 +3246,9 @@ class Stickr {
       };
       
       container.innerHTML = topLevelComments.map(comment => renderComment(comment)).join('');
+      
+      // Re-assert visibility styles after render
+      this.ensureSidebarUIVisibility();
       
       // Reply buttons
       container.querySelectorAll('.dc-reply').forEach(btn => {
@@ -2653,7 +3548,7 @@ class Stickr {
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 11px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -2767,7 +3662,7 @@ class Stickr {
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 11px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -2976,9 +3871,14 @@ class Stickr {
     
     // Show configuration menu
     async showConfigMenu() {
-      const result = await chrome.storage.sync.get(['dbProvider', 'aiProvider']);
-      const dbProvider = result.dbProvider || 'none';
-      const aiProvider = result.aiProvider || 'none';
+      if (!this.isExtensionContextValid()) {
+        console.warn('Extension context invalidated, cannot show config menu');
+        return;
+      }
+      
+      const result = await this.safeChromeStorage(() => chrome.storage.sync.get(['dbProvider', 'aiProvider']));
+      const dbProvider = result ? (result.dbProvider || 'none') : 'none';
+      const aiProvider = result ? (result.aiProvider || 'none') : 'none';
       let dbStatusText = 'Configure team collaboration database';
       let aiStatusText = 'Configure AI provider for chart analysis';
       
@@ -3463,8 +4363,9 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
             ticketDiv.setAttribute('data-selected', 'true');
             ticketDiv.setAttribute('data-ticket-key', ticket.key);
             ticketDiv.setAttribute('data-ticket-url', `${this.jira.jiraUrl}/browse/${ticket.key}`);
+            ticketDiv.setAttribute('data-ticket-summary', ticket.fields?.summary || '');
             
-            console.log('✅ Selected ticket:', ticket.key);
+            console.log('✅ Selected ticket:', ticket.key, 'summary:', ticket.fields?.summary);
           });
           
           ticketsList.appendChild(ticketDiv);
@@ -3506,7 +4407,8 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
           const jiraUrl = `${this.jira.jiraUrl}/browse/${result.key}`;
           comment.jiraTicket = {
             key: result.key,
-            url: jiraUrl
+            url: jiraUrl,
+            summary: result.summary || summary // Use summary from API response or fallback to input
           };
           console.log('🔍 Creating Jira ticket for comment:', comment.id, 'result.key:', result.key, 'jira.jiraUrl:', this.jira.jiraUrl, 'constructed url:', jiraUrl, 'jiraTicket:', comment.jiraTicket);
           
@@ -3556,6 +4458,7 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
       
       const ticketKey = selectedTicket.getAttribute('data-ticket-key');
       const ticketUrl = selectedTicket.getAttribute('data-ticket-url');
+      const ticketSummary = selectedTicket.getAttribute('data-ticket-summary') || selectedTicket.textContent.trim();
       
       createBtn.textContent = '⏳ Attaching...';
       createBtn.disabled = true;
@@ -3564,7 +4467,8 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
         // Update comment with Jira ticket info
         comment.jiraTicket = {
           key: ticketKey,
-          url: ticketUrl
+          url: ticketUrl,
+          summary: ticketSummary || undefined // Store summary if available
         };
         console.log('🔍 Attaching Jira ticket to comment:', comment.id, 'ticketKey:', ticketKey, 'ticketUrl:', ticketUrl, 'jiraTicket:', comment.jiraTicket);
         
@@ -3676,13 +4580,18 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
         const imageData = canvas.toDataURL('image/png');
         
         // Analyze with AI
+        // Build prompt with user role context
+        const userRoleContext = this.userRole 
+          ? `\n\nContext: The user is a ${this.userRole}. Please tailor your analysis and recommendations to be relevant and actionable for someone in this role. Focus on insights that would be most valuable for a ${this.userRole}.`
+          : '';
+        
         const analysis = await this.ai.analyzeChart(imageData, `Analyze this dashboard chart and provide insights on:
 1. Key metrics and their current values
 2. Trends or patterns visible in the data
 3. Any anomalies or interesting observations
 4. Actionable recommendations based on the data
 
-Provide a clear, concise analysis.`);
+Provide a clear, concise analysis.${userRoleContext}`);
         
         // Show results dialog
         loadingDialog.remove();
@@ -3765,6 +4674,33 @@ Provide a clear, concise analysis.`);
           </div>
         `;
         document.body.appendChild(errorDialog);
+      }
+    }
+
+    // Ensure UI visibility against host page CSS overrides
+    ensureSidebarUIVisibility() {
+      try {
+        const root = document.getElementById('stickr-sidebar');
+        if (!root) return;
+        // Buttons
+        root.querySelectorAll('.dc-btn-icon, .dc-comment-actions button').forEach(el => {
+          el.style.display = 'flex';
+          el.style.visibility = 'visible';
+          el.style.opacity = '1';
+        });
+        // Containers
+        root.querySelectorAll('.dc-comment-card, .dc-comment-actions').forEach(el => {
+          el.style.overflow = 'visible';
+          el.style.visibility = 'visible';
+        });
+        // Select dropdowns - ensure text is visible
+        root.querySelectorAll('select, .dc-select, .dc-form-input select').forEach(el => {
+          el.style.color = '#374151';
+          el.style.fontWeight = '500';
+          el.style.zIndex = '1000';
+        });
+      } catch (e) {
+        console.warn('ensureSidebarUIVisibility failed:', e);
       }
     }
   }
