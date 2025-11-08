@@ -29,35 +29,103 @@ class JiraIntegration {
     return false;
   }
 
-  async testConnection() {
+  async testConnection(addLog = null) {
+    const startTime = Date.now();
+    const log = addLog || (() => {});
+    
+    log('Starting Jira connection test...');
+    console.log('🔍 [JIRA] Starting connection test...');
+    console.log('🔍 [JIRA] URL:', this.jiraUrl);
+    console.log('🔍 [JIRA] Email:', this.jiraEmail);
+    console.log('🔍 [JIRA] API Token present:', !!this.jiraApiToken);
+    
     try {
-      console.log('🔍 Testing Jira connection...');
-      console.log('🔍 Jira URL:', this.jiraUrl);
-      console.log('🔍 Jira Email:', this.jiraEmail);
-      console.log('🔍 API Token present:', !!this.jiraApiToken);
-      
-      const auth = btoa(`${this.jiraEmail}:${this.jiraApiToken}`);
-      
-      // Use background script to bypass CORS
-      const result = await chrome.runtime.sendMessage({
-        action: 'fetchAPI',
-        url: `${this.jiraUrl}/rest/api/3/myself`,
-        options: {
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Accept': 'application/json'
-          }
-        }
-      });
-      
-      if (result.success) {
-        console.log('✅ Jira connection successful:', result.data.displayName);
-        return { success: true, user: result.data.displayName };
+      if (!this.jiraUrl || !this.jiraEmail || !this.jiraApiToken) {
+        log('Missing JIRA credentials', 'error');
+        console.error('❌ [JIRA] Missing credentials');
+        return { success: false, error: 'Missing JIRA credentials' };
       }
       
-      return { success: false, error: result.error || 'Authentication failed' };
+      const auth = btoa(`${this.jiraEmail}:${this.jiraApiToken}`);
+      const testUrl = `${this.jiraUrl}/rest/api/3/myself`;
+      
+      log(`Sending request to: ${testUrl}`);
+      log(`Method: GET`);
+      log(`Headers: Authorization (Basic), Accept`);
+      log('Using background script to bypass CORS...');
+      console.log('🔍 [JIRA] Sending request to:', testUrl);
+      console.log('🔍 [JIRA] Request timestamp:', new Date().toISOString());
+      
+      // Use background script to bypass CORS (required for Chrome extensions)
+      try {
+        const response = await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            log('Connection timeout after 30 seconds', 'error');
+            reject(new Error('Connection timeout after 30 seconds'));
+          }, 30000);
+          
+          log('Sending request via background script...');
+          chrome.runtime.sendMessage({
+            action: 'fetchAPI',
+            url: testUrl,
+            options: {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${auth}`,
+                'Accept': 'application/json'
+              }
+            }
+          }, (response) => {
+            clearTimeout(timeoutId);
+            
+            if (chrome.runtime.lastError) {
+              log(`Background script error: ${chrome.runtime.lastError.message}`, 'error');
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            
+            if (!response) {
+              log('No response from background script', 'error');
+              reject(new Error('No response from background script'));
+              return;
+            }
+            
+            if (response.error) {
+              log(`Background script returned error: ${response.error}`, 'error');
+              reject(new Error(response.error));
+              return;
+            }
+            
+            resolve(response);
+          });
+        });
+        
+        const elapsed = Date.now() - startTime;
+        
+        if (response && response.success && response.data) {
+          const data = response.data;
+          log(`Response received (${elapsed}ms): success`, 'success');
+          log(`Connection successful! User: ${data?.displayName || 'Unknown'}`, 'success');
+          console.log(`🔍 [JIRA] Response received (${elapsed}ms): success`);
+          console.log('✅ [JIRA] Connection successful:', data?.displayName || 'Unknown user');
+          return { success: true, user: data?.displayName };
+        } else {
+          const errorText = response?.error || response?.message || 'Unknown error';
+          log(`Response received (${elapsed}ms): error`, 'error');
+          log(`Error: ${errorText.substring(0, 100)}`, 'error');
+          console.error('❌ [JIRA] Connection failed:', errorText);
+          return { success: false, error: errorText.substring(0, 200) };
+        }
+      } catch (error) {
+        const elapsed = Date.now() - startTime;
+        log(`Connection error: ${error.message}`, 'error');
+        console.error('❌ [JIRA] Connection error:', error);
+        return { success: false, error: error.message };
+      }
     } catch (error) {
-      console.error('Jira connection test failed:', error);
+      const elapsed = Date.now() - startTime;
+      log(`Connection test failed after ${elapsed}ms: ${error.message}`, 'error');
+      console.error(`❌ [JIRA] Connection test failed after ${elapsed}ms:`, error);
       return { success: false, error: error.message };
     }
   }
@@ -112,7 +180,8 @@ class JiraIntegration {
         console.log('✅ Jira issue created:', result.data.key);
         return {
           key: result.data.key,
-          url: `${this.jiraUrl}/browse/${result.data.key}`
+          url: `${this.jiraUrl}/browse/${result.data.key}`,
+          summary: result.data.fields?.summary || summary // Use API response summary or fallback to input summary
         };
       } else {
         throw new Error(result.error || 'Failed to create issue');
@@ -375,37 +444,95 @@ class AIIntegration {
     return false;
   }
 
-  async testConnection() {
+  async testConnection(addLog = null) {
+    const startTime = Date.now();
+    const log = addLog || (() => {});
+    
+    log(`Starting ${this.provider?.toUpperCase()} connection test...`);
+    console.log(`🔍 [AI-${this.provider?.toUpperCase()}] Starting connection test...`);
+    console.log(`🔍 [AI-${this.provider?.toUpperCase()}] API Key present:`, !!this.apiKey);
+    
+    if (!this.provider || !this.apiKey) {
+      log(`Missing provider or API key`, 'error');
+      console.error(`❌ [AI-${this.provider?.toUpperCase()}] Missing provider or API key`);
+      return false;
+    }
+    
     try {
-      console.log('🔍 Testing connection for provider:', this.provider);
-      console.log('🔍 API Key present:', !!this.apiKey);
-      
       if (this.provider === 'openai') {
-        console.log('🔍 Testing OpenAI connection...');
-        // Use background script to bypass CORS
-        const result = await chrome.runtime.sendMessage({
-          action: 'fetchAPI',
-          url: 'https://api.openai.com/v1/models',
-          options: {
+        log('Testing OpenAI connection...');
+        const testUrl = 'https://api.openai.com/v1/models';
+        log(`Sending request to: ${testUrl}`);
+        log(`Method: GET`);
+        log(`Headers: Authorization`);
+        console.log('🔍 [AI-OPENAI] Testing OpenAI connection...');
+        console.log('🔍 [AI-OPENAI] Sending request to:', testUrl);
+        console.log('🔍 [AI-OPENAI] Request timestamp:', new Date().toISOString());
+        
+        // DIRECT FETCH (bypassing background script for testing)
+        log(`Sending direct fetch request to: ${testUrl}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          log('Connection timeout after 30 seconds', 'error');
+        }, 30000);
+        
+        try {
+          const response = await fetch(testUrl, {
+            method: 'GET',
             headers: {
               'Authorization': `Bearer ${this.apiKey}`
-            }
+            },
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          
+          if (response.ok) {
+            log(`Response received (${elapsed}ms): success`, 'success');
+            log('Connection successful!', 'success');
+            console.log(`🔍 [AI-OPENAI] Response received (${elapsed}ms): success`);
+            console.log('✅ [AI-OPENAI] Connection successful');
+            return true;
+          } else {
+            const errorText = await response.text();
+            log(`Response received (${elapsed}ms): error`, 'error');
+            log(`Error: HTTP ${response.status} - ${errorText.substring(0, 100)}`, 'error');
+            console.error('❌ [AI-OPENAI] Connection failed:', response.status, errorText);
+            return false;
           }
-        });
-        
-        if (result.success) {
-          console.log('✅ OpenAI connection successful');
-          return true;
-        } else {
-          console.error('❌ OpenAI connection failed:', result.error);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          if (error.name === 'AbortError') {
+            log(`Connection timeout after ${elapsed}ms`, 'error');
+            return false;
+          }
+          log(`Connection error: ${error.message}`, 'error');
+          console.error('❌ [AI-OPENAI] Connection error:', error);
           return false;
         }
       } else if (this.provider === 'anthropic') {
-        // Use background script to bypass CORS
-        const result = await chrome.runtime.sendMessage({
-          action: 'fetchAPI',
-          url: 'https://api.anthropic.com/v1/messages',
-          options: {
+        log('Testing Anthropic connection...');
+        const testUrl = 'https://api.anthropic.com/v1/messages';
+        log(`Sending request to: ${testUrl}`);
+        log(`Method: POST`);
+        log(`Headers: x-api-key, anthropic-version, content-type`);
+        console.log('🔍 [AI-ANTHROPIC] Testing Anthropic connection...');
+        console.log('🔍 [AI-ANTHROPIC] Sending request to:', testUrl);
+        console.log('🔍 [AI-ANTHROPIC] Request timestamp:', new Date().toISOString());
+        
+        // DIRECT FETCH (bypassing background script for testing)
+        log(`Sending direct fetch request to: ${testUrl}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          log('Connection timeout after 30 seconds', 'error');
+        }, 30000);
+        
+        try {
+          const response = await fetch(testUrl, {
             method: 'POST',
             headers: {
               'x-api-key': this.apiKey,
@@ -417,23 +544,57 @@ class AIIntegration {
               model: this.model || 'claude-3-5-sonnet-20241022',
               max_tokens: 10,
               messages: [{ role: 'user', content: 'test' }]
-            })
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          
+          if (response.ok) {
+            log(`Response received (${elapsed}ms): success`, 'success');
+            log('Connection successful!', 'success');
+            console.log(`🔍 [AI-ANTHROPIC] Response received (${elapsed}ms): success`);
+            console.log('✅ [AI-ANTHROPIC] Connection successful');
+            return true;
+          } else {
+            const errorText = await response.text();
+            log(`Response received (${elapsed}ms): error`, 'error');
+            log(`Error: HTTP ${response.status} - ${errorText.substring(0, 100)}`, 'error');
+            console.error('❌ [AI-ANTHROPIC] Connection failed:', response.status, errorText);
+            return false;
           }
-        });
-        
-        if (result.success) {
-          console.log('✅ Anthropic/Claude connection successful');
-          return true;
-        } else {
-          console.error('❌ Anthropic/Claude connection failed:', result.error);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          if (error.name === 'AbortError') {
+            log(`Connection timeout after ${elapsed}ms`, 'error');
+            return false;
+          }
+          log(`Connection error: ${error.message}`, 'error');
+          console.error('❌ [AI-ANTHROPIC] Connection error:', error);
           return false;
         }
       } else if (this.provider === 'gemini') {
-        // Test Gemini API
-        const result = await chrome.runtime.sendMessage({
-          action: 'fetchAPI',
-          url: `https://generativelanguage.googleapis.com/v1beta/models/${this.model || 'gemini-pro'}:generateContent?key=${this.apiKey}`,
-          options: {
+        log('Testing Gemini connection...');
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model || 'gemini-pro'}:generateContent?key=${this.apiKey}`;
+        log(`Sending request to: ${testUrl.replace(this.apiKey, '***')}`);
+        log(`Method: POST`);
+        log(`Headers: Content-Type`);
+        console.log('🔍 [AI-GEMINI] Testing Gemini connection...');
+        console.log('🔍 [AI-GEMINI] Sending request to:', testUrl.replace(this.apiKey, '***'));
+        console.log('🔍 [AI-GEMINI] Request timestamp:', new Date().toISOString());
+        
+        // DIRECT FETCH (bypassing background script for testing)
+        log(`Sending direct fetch request to: ${testUrl.replace(this.apiKey, '***')}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          log('Connection timeout after 30 seconds', 'error');
+        }, 30000);
+        
+        try {
+          const response = await fetch(testUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -442,21 +603,46 @@ class AIIntegration {
               contents: [{
                 parts: [{ text: 'test' }]
               }]
-            })
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          
+          if (response.ok) {
+            log(`Response received (${elapsed}ms): success`, 'success');
+            log('Connection successful!', 'success');
+            console.log(`🔍 [AI-GEMINI] Response received (${elapsed}ms): success`);
+            console.log('✅ [AI-GEMINI] Connection successful');
+            return true;
+          } else {
+            const errorText = await response.text();
+            log(`Response received (${elapsed}ms): error`, 'error');
+            log(`Error: HTTP ${response.status} - ${errorText.substring(0, 100)}`, 'error');
+            console.error('❌ [AI-GEMINI] Connection failed:', response.status, errorText);
+            return false;
           }
-        });
-        
-        if (result.success) {
-          console.log('✅ Google Gemini connection successful');
-          return true;
-        } else {
-          console.error('❌ Google Gemini connection failed:', result.error);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          if (error.name === 'AbortError') {
+            log(`Connection timeout after ${elapsed}ms`, 'error');
+            return false;
+          }
+          log(`Connection error: ${error.message}`, 'error');
+          console.error('❌ [AI-GEMINI] Connection error:', error);
           return false;
         }
       }
+      
+      log(`Unknown provider: ${this.provider}`, 'error');
+      console.error(`❌ [AI-${this.provider?.toUpperCase()}] Unknown provider`);
       return false;
     } catch (error) {
-      console.error('AI connection test failed:', error);
+      const elapsed = Date.now() - startTime;
+      log(`Connection test failed after ${elapsed}ms: ${error.message}`, 'error');
+      console.error(`❌ [AI-${this.provider?.toUpperCase()}] Connection test failed after ${elapsed}ms:`, error);
       return false;
     }
   }

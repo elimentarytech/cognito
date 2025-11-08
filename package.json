@@ -12,7 +12,7 @@
     "package": "npm run build-clean && cd dist && zip -r cognito-ai-extension-final.zip ."
   },
   "devDependencies": {
-    "javascript-obfuscator": "^4.0.2",
+    "javascript-obfuscator": "^4.1.1",
     "terser": "^5.24.0"
   },
   "keywords": [

@@ -104,7 +104,7 @@ Stickr AI is a powerful Chrome extension that transforms how teams collaborate o
 
 4. **Create Table**
    ```sql
-   CREATE TABLE stickr_comments (
+   CREATE TABLE cognito_comments (
      id TEXT PRIMARY KEY,
      text TEXT NOT NULL,
      type TEXT NOT NULL,

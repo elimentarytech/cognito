@@ -33,8 +33,68 @@ body {
   font-family: var(--stickr-font-family);
 }
 
+/* Password toggle button styles */
+.dc-toggle-password {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6B7280;
+  transition: color 0.2s ease;
+}
+
+/* Copy logs button styles */
+.dc-copy-logs-btn {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 11px;
+  color: #6B7280;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dc-copy-logs-btn:hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  color: #374151;
+}
+
+.dc-copy-logs-btn:active {
+  transform: scale(0.98);
+}
+
+.dc-copy-logs-btn svg {
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.dc-toggle-password:hover {
+  color: #374151;
+}
+
+.dc-toggle-password:focus {
+  outline: none;
+  color: #667eea;
+}
+
+.dc-toggle-password svg {
+  pointer-events: none;
+}
+
 /* Sidebar - Classy Design */
-.dc-sidebar {
+  .dc-sidebar {
     font-family: var(--stickr-font-family);
     position: fixed;
     top: 0;
@@ -42,16 +102,17 @@ body {
     height: 100%;
     width: 400px;
     max-width: 90vw;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: #ffffff !important; /* Fully opaque white background */
     border-left: 1px solid rgba(224, 224, 224, 0.6);
     box-shadow: -20px 0 40px rgba(0, 0, 0, 0.08), -10px 0 20px rgba(0, 0, 0, 0.04);
-    z-index: 9999;
+    z-index: 999999 !important; /* Ensure sidebar is on top */
+    isolation: isolate; /* Create new stacking context */
     display: flex;
     flex-direction: column;
     transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transform: translateX(100%);
+    box-sizing: border-box;
+    overflow: hidden;
   }
   
   .dc-sidebar.open {
@@ -130,29 +191,15 @@ body {
     box-shadow: -4px 0 12px rgba(245, 158, 11, 0.2);
   }
   
-  .dc-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid rgba(224, 224, 224, 0.6);
-    flex-shrink: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%);
-  }
+  /* Old header style - overridden by .dc-sidebar-header with purple gradient below */
+  /* This rule is kept for backward compatibility but the purple gradient header takes precedence */
   
-  .dc-sidebar-header h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--stickr-foreground);
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  /* Old header h3 style - overridden by purple gradient header h3 below */
+  /* This rule is kept for backward compatibility but the purple gradient header takes precedence */
   
   .dc-toggle-btn {
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(224, 224, 224, 0.6);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 8px;
     padding: 0.5rem;
     width: 36px;
@@ -162,12 +209,17 @@ body {
     justify-content: center;
     font-size: 1.25rem;
     flex-shrink: 0;
-    margin-left: auto;
-    color: var(--stickr-muted-foreground);
+    margin: 0;
+    color: white;
     transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     overflow: hidden;
+  }
+  
+  .dc-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
   }
   
   /* High-quality image scaling for toggle icons */
@@ -178,6 +230,9 @@ body {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    position: relative;
+    z-index: 13; /* Ensure logo icon is visible above button background */
+    display: block;
   }
   
   .dc-toggle-icon-flipped {
@@ -199,15 +254,25 @@ body {
   .dc-sidebar-content {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 2rem;
-    background: rgba(255, 255, 255, 0.3);
+    padding: 0;
+    background: #ffffff !important; /* Fully opaque white background */
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
   }
   
   .dc-sidebar-input-area {
     padding: 1rem;
     border-top: 1px solid rgba(224, 224, 224, 0.6);
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
+    background: #ffffff !important; /* Fully opaque white background */
+    flex-shrink: 0;
+    width: 100%;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 1;
   }
   
   .dc-sidebar-input-area textarea {
@@ -219,7 +284,7 @@ body {
     padding: 0.5rem 0.75rem;
     font-family: var(--stickr-font-family);
     font-size: 0.875rem;
-    background: rgba(255, 255, 255, 0.9);
+    background: #ffffff !important; /* Fully opaque white background */
     resize: vertical;
     margin-bottom: 0.5rem;
   }
@@ -238,12 +303,74 @@ body {
   
   .dc-sidebar-input-controls select {
     flex: 1;
-    padding: 0.5rem;
+    min-height: 40px;
+    height: 40px;
+    padding: 0.625rem 3rem 0.625rem 0.875rem;
     border: 1px solid rgba(224, 224, 224, 0.6);
     border-radius: 0.375rem;
     font-family: var(--stickr-font-family);
     font-size: 0.875rem;
-    background: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
+    background: #ffffff !important; /* Fully opaque white background */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    background-clip: padding-box;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    -ms-appearance: none !important;
+    cursor: pointer;
+    z-index: 1000;
+    position: relative;
+    color: #374151;
+    box-sizing: border-box;
+    font-weight: 500;
+    overflow: hidden;
+  }
+  
+  /* Hide native dropdown arrow for input controls select - AGGRESSIVE */
+  .dc-sidebar-input-controls select::-ms-expand {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  .dc-sidebar-input-controls select::-webkit-appearance {
+    -webkit-appearance: none !important;
+  }
+  
+  .dc-sidebar-input-controls select::-moz-appearance {
+    -moz-appearance: none !important;
+  }
+  
+  .dc-sidebar-input-controls select::-webkit-inner-spin-button,
+  .dc-sidebar-input-controls select::-webkit-outer-spin-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+  }
+  
+  .dc-sidebar-input-controls select::after,
+  .dc-sidebar-input-controls select::before {
+    display: none !important;
+    content: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  
+  .dc-sidebar-input-controls select option {
+    background: #ffffff;
+    color: #374151;
+    padding: 0.625rem 0.75rem;
+    display: block;
+    visibility: visible;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    min-height: 2rem;
   }
   
   .dc-sidebar-input-controls button {
@@ -345,11 +472,14 @@ body {
     padding: 0.25rem;
     min-width: 24px;
     height: 24px;
-    opacity: 0.8;
+    opacity: 1;
     transition: all 0.2s ease;
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
+    visibility: visible !important;
+    position: relative;
+    z-index: 10;
   }
   
   .dc-btn-icon img {
@@ -365,6 +495,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    padding: 1rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    box-sizing: border-box;
+    width: 100%;
+    background: #ffffff !important; /* Fully opaque white background */
+    position: relative;
+    z-index: 1;
   }
   
   .dc-empty-state {
@@ -390,7 +529,7 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    overflow: hidden;
+    overflow: visible;
   }
   
   /* Bubble comment - Amber/Orange tint */
@@ -429,7 +568,7 @@ body {
   .dc-comment-card[style*="margin-left"]:not([style*="margin-left: 0px"]) {
     border-left: 3px solid rgba(245, 158, 11, 0.4);
     background: rgba(245, 158, 11, 0.02);
-    overflow: hidden;
+    overflow: visible;
   }
   
   .dc-comment-card::before {
@@ -576,6 +715,10 @@ body {
     gap: 0.25rem;
     align-items: center;
     flex-shrink: 0;
+    z-index: 10;
+    position: relative;
+    visibility: visible;
+    opacity: 1;
   }
   
   /* Reply Dialog */
@@ -663,6 +806,19 @@ body {
     background: white;
     cursor: pointer;
     transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    z-index: 1000;
+    position: relative;
+  }
+  
+  .dc-select option {
+    background: #ffffff;
+    color: var(--stickr-foreground);
+    padding: 0.5rem;
+    display: block;
+    visibility: visible;
   }
   
   .dc-select:focus {
@@ -796,45 +952,74 @@ body {
     width: 100%;
     min-height: 140px;
     padding: 16px;
-    border: 1px solid var(--border);
+    border: 2px solid #9CA3AF !important; /* Darker, more visible border */
     border-radius: var(--radius-md);
     font-size: 14px;
     font-family: inherit;
     resize: vertical;
     margin-bottom: 16px;
     background: var(--background);
-    color: var(--text-primary);
+    color: #1F2937 !important; /* Dark text for better readability */
+    font-weight: 400;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .dc-comment-input:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #3B82F6 !important; /* Blue border on focus */
+    border-width: 2px !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
   
   .dc-comment-input::placeholder {
-    color: var(--text-muted);
+    color: #9CA3AF; /* Lighter placeholder text */
   }
   
   .dc-link-input,
   .dc-type-select {
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid var(--border);
+    border: 2px solid #9CA3AF !important; /* Darker, more visible border */
     border-radius: var(--radius-md);
     font-size: 14px;
     margin-bottom: 16px;
     background: var(--background);
-    color: var(--text-primary);
+    color: #1F2937 !important; /* Dark text for better readability */
+    font-weight: 500;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .dc-link-input:focus,
   .dc-type-select:focus {
     outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #3B82F6 !important; /* Blue border on focus */
+    border-width: 2px !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .dc-type-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+  }
+  
+  .dc-type-select option {
+    background: #ffffff !important;
+    color: #1F2937 !important; /* Dark text for dropdown options */
+    font-weight: 500;
+    padding: 8px;
+  }
+  
+  .dc-type-select option:checked {
+    background: #F3F4F6 !important;
+    color: #1F2937 !important;
+    font-weight: 600;
   }
   
   .dc-link-input::placeholder {
@@ -1331,6 +1516,7 @@ body {
 /* Database Form Sections */
 .db-form {
   animation: fadeIn 0.3s ease;
+  text-align: left;
 }
 
 @keyframes fadeIn {
@@ -1379,6 +1565,7 @@ body {
   padding: 0.75rem;
   margin-bottom: 1rem;
   font-size: 11px;
+  text-align: left;
 }
 
 .db-setup-guide-title {
@@ -1386,27 +1573,82 @@ body {
   margin-bottom: 0.5rem;
   font-size: 12px;
   color: #92400E;
+  text-align: left;
 }
 
 .db-setup-guide ol {
   margin: 0;
   padding-left: 1.25rem;
   color: #78350F;
+  text-align: left;
 }
 
 .db-setup-guide li {
+  margin-bottom: 0.5rem;
+  text-align: left;
+  line-height: 1.6;
+}
+
+.db-setup-guide ul {
+  margin-top: 0.25rem;
+  padding-left: 1.25rem;
+  text-align: left;
+}
+
+.db-setup-guide ul li {
   margin-bottom: 0.25rem;
 }
 
 .db-setup-guide pre {
   background: #FEFCE8;
-  padding: 0.5rem;
-  margin-top: 0.5rem;
-  border-radius: 4px;
-  font-size: 10px;
+  padding: 0.75rem 3rem 0.75rem 0.75rem;
+  margin-top: 0.75rem;
+  border-radius: 6px;
+  font-size: 12px;
   overflow-x: auto;
-  line-height: 1.3;
-  border: 1px solid #FDE68A;
+  line-height: 1.5;
+  border: 2px solid #F59E0B;
+  font-family: 'Monaco', 'Courier New', monospace;
+  color: #92400E;
+  text-align: left;
+  display: block;
+  position: relative;
+}
+
+.dc-copy-sql-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #E5E7EB;
+  border-radius: 4px;
+  padding: 0.375rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 11px;
+  color: #6B7280;
+  transition: all 0.2s ease;
+  z-index: 10;
+  font-family: var(--stickr-font-family);
+}
+
+.dc-copy-sql-btn:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+  color: #374151;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dc-copy-sql-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.dc-copy-sql-btn svg {
+  flex-shrink: 0;
 }
 
 /* Sidebar Header Redesign */
@@ -1415,33 +1657,73 @@ body {
   flex-direction: column;
   gap: 0;
   padding: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; /* Fully opaque purple gradient */
   border-bottom: none;
+  box-sizing: border-box;
+  width: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10 !important; /* Ensure header is above other sidebar elements */
 }
 
 .dc-header-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  gap: 10rem;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 11; /* Above header background */
 }
 
 .dc-header-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 12; /* Ensure logo and text are visible */
+}
+
+.dc-header-left .dc-toggle-btn {
+  flex-shrink: 0;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.2) !important; /* Semi-transparent white on purple */
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: white !important; /* Ensure icon is white and visible */
+  position: relative;
+  z-index: 12; /* Ensure button is above background */
+}
+
+.dc-header-left .dc-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.dc-header-left h3 {
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .dc-header-right {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  position: relative;
+  z-index: 12; /* Ensure settings button is visible */
 }
 
 .dc-sidebar-header h3 {
-  color: white;
+  color: white !important; /* Ensure text is white and visible */
   font-size: 1.25rem;
   font-weight: 600;
+  position: relative;
+  z-index: 12; /* Ensure text is above background */
 }
 
 
@@ -1450,12 +1732,14 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15) !important; /* Semi-transparent white on purple */
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 6px;
-  color: white;
+  color: white !important; /* Ensure icon is white and visible */
   font-size: 0.875rem;
   font-weight: 500;
+  position: relative;
+  z-index: 12; /* Ensure button is above background */
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 36px;
@@ -1501,7 +1785,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .dc-toggle-label {
@@ -1569,13 +1854,95 @@ input:checked + .dc-slider:hover {
 /* Filter Select */
 .dc-filter-select {
   flex: 1;
-  padding: 0.5rem 0.75rem;
+  min-width: 0;
+  min-height: 40px;
+  height: 40px;
+  padding: 0.625rem 3rem 0.625rem 0.875rem;
   border: 1px solid var(--stickr-border);
   border-radius: 6px;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
   background: white;
   cursor: pointer;
   transition: border-color 0.2s;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  -ms-appearance: none !important;
+  z-index: 1000;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  color: #374151;
+  font-weight: 500;
+  overflow: hidden;
+  background-clip: padding-box;
+}
+
+.dc-filter-select:not([multiple]):not([size]) {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  background-clip: padding-box;
+}
+
+/* Hide all native browser dropdown UI elements - AGGRESSIVE */
+.dc-filter-select::-webkit-select-value {
+  color: #374151;
+  font-weight: 500;
+}
+
+.dc-filter-select::-moz-selection {
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Hide IE/Edge native dropdown arrow */
+.dc-filter-select::-ms-expand {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Hide WebKit native dropdown arrow completely */
+.dc-filter-select::-webkit-appearance {
+  -webkit-appearance: none !important;
+}
+
+.dc-filter-select::-moz-appearance {
+  -moz-appearance: none !important;
+}
+
+/* Remove any text decoration or pseudo-elements */
+.dc-filter-select::after,
+.dc-filter-select::before {
+  display: none !important;
+  content: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Additional WebKit-specific hiding */
+.dc-filter-select::-webkit-inner-spin-button,
+.dc-filter-select::-webkit-outer-spin-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+/* Force hide any native dropdown indicators */
+.dc-filter-select option {
+  background: #ffffff;
+  color: #374151;
+  padding: 0.625rem 0.75rem;
+  display: block;
+  visibility: visible;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 2rem;
 }
 
 .dc-filter-select:focus {
@@ -1836,6 +2203,82 @@ input:checked + .dc-slider:hover {
   height: 36px;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  color: #374151 !important;
+  font-weight: 500;
+}
+
+.dc-form-input[type="select"],
+.dc-form-input select,
+select.dc-form-input {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  -ms-appearance: none !important;
+  cursor: pointer;
+  z-index: 1000;
+  position: relative;
+  color: #1F2937 !important;
+  font-weight: 500 !important;
+  padding-right: 2.5rem;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+}
+
+/* Force selected text to be visible */
+select.dc-form-input.dc-select-has-value {
+  color: #374151 !important;
+  font-weight: 500 !important;
+}
+
+select.dc-form-input.dc-select-empty {
+  color: #9CA3AF !important;
+  font-weight: 400 !important;
+}
+
+select.dc-form-input option {
+  background: #ffffff !important;
+  color: #374151 !important;
+  padding: 0.5rem;
+  display: block;
+  visibility: visible;
+  font-weight: 500 !important;
+}
+
+select.dc-form-input option:checked {
+  background: #F3F4F6 !important;
+  color: #374151 !important;
+  font-weight: 600 !important;
+}
+
+select.dc-form-input option[value=""] {
+  color: #9CA3AF !important;
+  font-weight: 400 !important;
+}
+
+/* Ensure selected value is visible in form selects */
+select.dc-form-input {
+  color: #1F2937 !important;
+  -webkit-text-fill-color: #1F2937 !important;
+}
+
+select.dc-form-input:invalid {
+  color: #9CA3AF !important;
+  -webkit-text-fill-color: #9CA3AF !important;
+}
+
+select.dc-form-input option {
+  color: #1F2937 !important;
+  background: #ffffff !important;
+}
+
+select.dc-form-input option:checked {
+  background: #F3F4F6 !important;
+  color: #1F2937 !important;
+  font-weight: 600 !important;
 }
 
 .dc-form-input:focus {
@@ -1923,33 +2366,44 @@ input:checked + .dc-slider:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: #F8FAFC;
+  padding: 0.875rem 1rem;
+  background: #ffffff !important; /* Fully opaque white background */
   border-bottom: 1px solid #E5E7EB;
-  gap: 1rem;
+  gap: 0.75rem;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: 64px;
 }
 
 .dc-toolbar-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   flex: 1;
+  min-width: 0;
 }
 
 .dc-toolbar-right {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .dc-toolbar-right .dc-btn {
   padding: 0.5rem;
   min-width: 36px;
+  width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 /* Tooltips */
@@ -2040,13 +2494,29 @@ input:checked + .dc-slider:hover {
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
+    min-height: auto;
   }
   
   .dc-toolbar-left {
     justify-content: center;
+    flex-wrap: wrap;
   }
   
   .dc-toolbar-right {
     justify-content: center;
   }
+}
+
+/* Ensure all sidebar children respect box-sizing */
+.dc-sidebar * {
+  box-sizing: border-box;
+}
+
+/* Connectivity test logs - ensure left alignment */
+#dc-db-logs,
+#dc-jira-logs,
+#dc-ai-logs {
+  text-align: left !important;
+  direction: ltr !important;
+  unicode-bidi: embed;
 }

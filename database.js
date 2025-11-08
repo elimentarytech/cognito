@@ -88,64 +88,110 @@ class DatabaseAdapter {
 
   /**
    * Create Supabase client (lightweight REST implementation)
+   * Uses background script to bypass CORS
    */
   createSupabaseClient(url, key) {
+    const cleanUrl = url.replace(/\/$/, '');
+    
+    // Helper to make API requests - DIRECT FETCH (bypassing background script for testing)
+    const supabaseRequest = async (method, endpoint, body = null, prefer = null) => {
+      const headers = {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      };
+      
+      if (prefer) {
+        headers['Prefer'] = prefer;
+      }
+      
+      const requestUrl = `${cleanUrl}${endpoint}`;
+      const fetchOptions = {
+        method: method,
+        headers: headers
+      };
+      
+      if (body) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+      
+      try {
+        console.log(`🔗 [SUPABASE] Direct fetch: ${method} ${requestUrl}`);
+        const response = await fetch(requestUrl, fetchOptions);
+        
+        const contentType = response.headers.get('content-type');
+        let data = null;
+        
+        if (contentType && contentType.includes('application/json')) {
+          const text = await response.text();
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            data = { message: text };
+          }
+        } else {
+          const text = await response.text();
+          data = { message: text };
+        }
+        
+        if (!response.ok) {
+          return { data: null, error: { message: `HTTP ${response.status}: ${JSON.stringify(data).substring(0, 200)}` } };
+        }
+        
+        return { data: data, error: null };
+      } catch (error) {
+        console.error(`🔗 [SUPABASE] Direct fetch error:`, error);
+        return { data: null, error: { message: error.message } };
+      }
+    };
+    
     return {
       from: (table) => ({
         select: async (columns = '*') => {
-          const response = await fetch(`${url}/rest/v1/${table}?select=${columns}`, {
-            headers: {
-              'apikey': key,
-              'Authorization': `Bearer ${key}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          const data = await response.json();
-          return { data, error: response.ok ? null : data };
+          try {
+            const endpoint = `/rest/v1/${table}?select=${encodeURIComponent(columns)}`;
+            return await supabaseRequest('GET', endpoint);
+          } catch (error) {
+            console.error('Supabase select error:', error);
+            return { data: null, error: { message: error.message } };
+          }
         },
         
         insert: async (records) => {
-          const response = await fetch(`${url}/rest/v1/${table}`, {
-            method: 'POST',
-            headers: {
-              'apikey': key,
-              'Authorization': `Bearer ${key}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(records)
-          });
-          const data = await response.json();
-          return { data, error: response.ok ? null : data };
+          try {
+            const endpoint = `/rest/v1/${table}`;
+            // Use return=representation to get the inserted record back
+            const result = await supabaseRequest('POST', endpoint, records, 'return=representation');
+            return result;
+          } catch (error) {
+            console.error('Supabase insert error:', error);
+            return { data: null, error: { message: error.message } };
+          }
         },
         
         update: (updates) => ({
           eq: async (column, value) => {
-            const response = await fetch(`${url}/rest/v1/${table}?${column}=eq.${value}`, {
-              method: 'PATCH',
-              headers: {
-                'apikey': key,
-                'Authorization': `Bearer ${key}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify(updates)
-            });
-            const data = await response.json();
-            return { data, error: response.ok ? null : data };
+            try {
+              const endpoint = `/rest/v1/${table}?${column}=eq.${encodeURIComponent(value)}`;
+              // Use return=representation to get the updated record back
+              return await supabaseRequest('PATCH', endpoint, updates, 'return=representation');
+            } catch (error) {
+              console.error('Supabase update error:', error);
+              return { data: null, error: { message: error.message } };
+            }
           }
         }),
         
-        delete: async () => ({
+        delete: () => ({
           eq: async (column, value) => {
-            const response = await fetch(`${url}/rest/v1/${table}?${column}=eq.${value}`, {
-              method: 'DELETE',
-              headers: {
-                'apikey': key,
-                'Authorization': `Bearer ${key}`
-              }
-            });
-            return { error: response.ok ? null : { message: 'Delete failed' } };
+            try {
+              const endpoint = `/rest/v1/${table}?${column}=eq.${encodeURIComponent(value)}`;
+              const result = await supabaseRequest('DELETE', endpoint);
+              return { error: result.error };
+            } catch (error) {
+              console.error('Supabase delete error:', error);
+              return { error: { message: error.message } };
+            }
           }
         })
       })
@@ -168,7 +214,7 @@ class DatabaseAdapter {
       body: JSON.stringify({
         dataSource: 'Cluster0', // Default cluster name
         database: this.config.database,
-        collection: 'stickr_comments',
+        collection: 'cognito_comments',
         ...data
       })
     });
@@ -223,47 +269,164 @@ class DatabaseAdapter {
   /**
    * Test database connection
    */
-  async testConnection(provider, config) {
+  async testConnection(provider, config, addLog = null) {
     try {
+      const log = addLog || (() => {});
+      log(`Initializing ${provider} connection test...`);
+      
       console.log('🔍 Testing database connection for provider:', provider);
       console.log('🔍 Config:', config);
       
       switch (provider) {
-        case 'supabase':
-          const result = await chrome.runtime.sendMessage({
-            action: 'fetchAPI',
-            url: `${config.url}/rest/v1/`,
-            options: {
-              headers: {
-                'apikey': config.key,
-                'Authorization': `Bearer ${config.key}`
-              }
-            }
-          });
-          console.log('🔍 Supabase test result:', result);
-          return result.success;
+        case 'supabase': {
+          // Handle both property name formats (url/key or supabaseUrl/supabaseKey)
+          const supabaseUrl = config.supabaseUrl || config.url;
+          const supabaseKey = config.supabaseKey || config.key;
           
-        case 'mongodb':
-          // Test MongoDB Atlas Data API connection
-          const mongoResult = await chrome.runtime.sendMessage({
-            action: 'fetchAPI',
-            url: `${config.uri}/action/findOne`,
-            options: {
+          if (!supabaseUrl || !supabaseKey) {
+            log('Error: Missing URL or API key', 'error');
+            console.error('🔍 Supabase config missing URL or key');
+            return false;
+          }
+          
+          // Clean up URL (remove trailing slash)
+          const cleanUrl = supabaseUrl.replace(/\/$/, '');
+          // Use /auth/v1/health endpoint - it's more reliable and faster for connectivity testing
+          const testUrl = `${cleanUrl}/auth/v1/health`;
+          log(`Sending request to: ${testUrl}`);
+          log(`Method: GET`);
+          log(`Headers: apikey, Authorization, Content-Type, User-Agent`);
+          console.log('🔍 Supabase test - Full URL:', testUrl);
+          console.log('🔍 Supabase test - API Key (first 10 chars):', supabaseKey.substring(0, 10));
+          
+          // Test connection using the health check endpoint
+          // This endpoint is specifically designed for connectivity testing and doesn't require tables
+          log('Waiting for response...');
+          
+          // DIRECT FETCH (bypassing background script for testing)
+          const requestTimestamp = new Date().toISOString();
+          log(`Request timestamp: ${requestTimestamp}`);
+          log(`Sending direct fetch request to: ${testUrl}`);
+          console.log('🔍 Supabase test - Request timestamp:', requestTimestamp);
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            log('Connection timeout after 30 seconds', 'error');
+          }, 30000);
+          
+          try {
+            const response = await fetch(testUrl, {
+              method: 'GET',
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'Cognito-AI-Extension/1.0'
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              const data = await response.json().catch(() => ({}));
+              log('Received successful response from Supabase API', 'success');
+              log(`Response: ${JSON.stringify(data).substring(0, 100)}...`, 'success');
+              console.log('🔍 Supabase test result: success');
+              return true;
+            } else {
+              const errorText = await response.text();
+              log(`Received response: HTTP ${response.status} - ${errorText.substring(0, 100)}...`);
+              // For health endpoint, any response (even 401/403) means we reached the server
+              const errorStr = errorText.toLowerCase();
+              if (errorStr.includes('permission') || errorStr.includes('unauthorized') || 
+                  errorStr.includes('forbidden') || errorStr.includes('schema') || 
+                  errorStr.includes('relation')) {
+                log('Connection successful (reached Supabase server)', 'success');
+                console.log('🔍 Supabase connection successful (reached server)');
+                return true;
+              }
+              log(`API error: HTTP ${response.status} - ${errorText.substring(0, 100)}`, 'error');
+              return false;
+            }
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+              log('Connection timeout after 30 seconds', 'error');
+              return false;
+            }
+            log(`Connection error: ${error.message}`, 'error');
+            console.error('🔍 Supabase test error:', error);
+            return false;
+          }
+          break;
+        }
+          
+        case 'mongodb': {
+          // Handle both property name formats
+          const mongoUrl = config.mongoUrl || config.uri;
+          const mongoApiKey = config.mongoApiKey || config.apiKey;
+          const mongoDatabase = config.mongoDatabase || config.database;
+          
+          if (!mongoUrl || !mongoApiKey || !mongoDatabase) {
+            log('Error: Missing URL, API key, or database name', 'error');
+            return false;
+          }
+          
+          log(`Sending request to: ${mongoUrl}/action/findOne`);
+          log(`Database: ${mongoDatabase}, Collection: cognito_comments`);
+          
+          // DIRECT FETCH (bypassing background script for testing)
+          const testUrl = `${mongoUrl}/action/findOne`;
+          log(`Sending direct fetch request to: ${testUrl}`);
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            log('Connection timeout after 30 seconds', 'error');
+          }, 30000);
+          
+          try {
+            const response = await fetch(testUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'api-key': config.apiKey || ''
+                'api-key': mongoApiKey
               },
               body: JSON.stringify({
                 dataSource: 'Cluster0',
-                database: config.database,
-                collection: 'stickr_comments',
+                database: mongoDatabase,
+                collection: 'cognito_comments',
                 filter: {}
-              })
+              }),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              log('Received successful response from MongoDB API', 'success');
+              console.log('🔍 MongoDB test result: success');
+              return true;
+            } else {
+              const errorText = await response.text();
+              log(`API error: HTTP ${response.status} - ${errorText.substring(0, 100)}`, 'error');
+              console.error('🔍 MongoDB test result: failed', response.status, errorText);
+              return false;
             }
-          });
-          console.log('🔍 MongoDB test result:', mongoResult);
-          return mongoResult.success;
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+              log('Connection timeout after 30 seconds', 'error');
+              return false;
+            }
+            log(`Connection error: ${error.message}`, 'error');
+            console.error('🔍 MongoDB test error:', error);
+            return false;
+          }
+          break;
+        }
           
         case 'postgresql':
         case 'mysql':
@@ -308,12 +471,21 @@ class DatabaseAdapter {
     try {
       switch (this.provider) {
         case 'supabase':
-          const { data, error } = await this.client.from('stickr_comments').select('*');
+          try {
+          const { data, error } = await this.client.from('cognito_comments').select('*');
           if (error) {
-            console.error('Error loading comments:', error);
+              console.error('❌ Supabase error loading comments:', error);
+              return [];
+            }
+            console.log('✅ Supabase loaded comments:', data ? data.length : 0, 'comments');
+            if (data && data.length > 0) {
+              console.log('📝 Sample comment:', data[0]);
+            }
+            return data || [];
+          } catch (err) {
+            console.error('❌ Exception loading comments from Supabase:', err);
             return [];
           }
-          return data || [];
           
         case 'mongodb':
           const mongoResult = await this.mongoDBRequest('find', {
@@ -323,13 +495,13 @@ class DatabaseAdapter {
           
         case 'postgresql':
           const pgResult = await this.postgresRequest(
-            'SELECT * FROM stickr_comments ORDER BY timestamp DESC'
+            'SELECT * FROM cognito_comments ORDER BY timestamp DESC'
           );
           return pgResult.rows || [];
           
         case 'mysql':
           const mysqlResult = await this.mysqlRequest(
-            'SELECT * FROM stickr_comments ORDER BY timestamp DESC'
+            'SELECT * FROM cognito_comments ORDER BY timestamp DESC'
           );
           return mysqlResult.rows || [];
           
@@ -365,7 +537,7 @@ class DatabaseAdapter {
         case 'supabase':
           console.log('🔍 Supabase update - comment ID:', comment.id);
           const { data, error } = await this.client
-            .from('stickr_comments')
+            .from('cognito_comments')
             .update(comment)
             .eq('id', comment.id);
           if (error) {
@@ -409,12 +581,17 @@ class DatabaseAdapter {
     try {
       switch (this.provider) {
         case 'supabase':
-          const { data, error } = await this.client.from('stickr_comments').insert([comment]);
+          const { data, error } = await this.client.from('cognito_comments').insert([comment]);
           if (error) {
             console.error('Error saving comment:', error);
             return null;
           }
-          return data[0];
+          // Supabase returns an array when using return=representation
+          // Handle both array and single object responses
+          if (Array.isArray(data)) {
+            return data[0] || comment; // Return first item or fallback to original
+          }
+          return data || comment; // Return data or fallback to original
           
         case 'mongodb':
           const mongoResult = await this.mongoDBRequest('insertOne', {
@@ -424,7 +601,7 @@ class DatabaseAdapter {
           
         case 'postgresql':
           const pgQuery = `
-            INSERT INTO stickr_comments (
+            INSERT INTO cognito_comments (
               id, text, link, "commentType", type, timestamp, author, 
               "pageId", "parentId", replies, "chartHash", "chartLabel", 
               "relativeX", "relativeY"
@@ -441,7 +618,7 @@ class DatabaseAdapter {
           
         case 'mysql':
           const mysqlQuery = `
-            INSERT INTO stickr_comments (
+            INSERT INTO cognito_comments (
               id, text, link, commentType, type, timestamp, author, 
               pageId, parentId, replies, chartHash, chartLabel, 
               relativeX, relativeY
@@ -480,7 +657,7 @@ class DatabaseAdapter {
     try {
       switch (this.provider) {
         case 'supabase':
-          const { error } = await this.client.from('stickr_comments').delete().eq('id', commentId);
+          const { error } = await this.client.from('cognito_comments').delete().eq('id', commentId);
           if (error) {
             console.error('Error deleting comment:', error);
             return false;
@@ -495,14 +672,14 @@ class DatabaseAdapter {
           
         case 'postgresql':
           const pgResult = await this.postgresRequest(
-            'DELETE FROM stickr_comments WHERE id = $1',
+            'DELETE FROM cognito_comments WHERE id = $1',
             [commentId]
           );
           return pgResult.rowCount > 0;
           
         case 'mysql':
           const mysqlResult = await this.mysqlRequest(
-            'DELETE FROM stickr_comments WHERE id = ?',
+            'DELETE FROM cognito_comments WHERE id = ?',
             [commentId]
           );
           return mysqlResult.affectedRows > 0;
@@ -532,7 +709,7 @@ class DatabaseAdapter {
     try {
       switch (this.provider) {
         case 'supabase':
-          const { error } = await this.client.from('stickr_comments').delete().eq('pageId', pageId);
+          const { error } = await this.client.from('cognito_comments').delete().eq('pageId', pageId);
           if (error) {
             console.error('Error clearing comments:', error);
             return false;
@@ -547,14 +724,14 @@ class DatabaseAdapter {
           
         case 'postgresql':
           await this.postgresRequest(
-            'DELETE FROM stickr_comments WHERE "pageId" = $1',
+            'DELETE FROM cognito_comments WHERE "pageId" = $1',
             [pageId]
           );
           return true;
           
         case 'mysql':
           await this.mysqlRequest(
-            'DELETE FROM stickr_comments WHERE pageId = ?',
+            'DELETE FROM cognito_comments WHERE pageId = ?',
             [pageId]
           );
           return true;

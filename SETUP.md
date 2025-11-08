@@ -46,7 +46,7 @@ When you first open Stickr AI on a dashboard:
 3. Paste this SQL and click "Run":
 
 ```sql
-CREATE TABLE stickr_comments (
+CREATE TABLE cognito_comments (
   id TEXT PRIMARY KEY,
   text TEXT,
   link TEXT,
@@ -64,9 +64,9 @@ CREATE TABLE stickr_comments (
 );
 
 -- Optional: Add indexes for better performance
-CREATE INDEX idx_page_id ON stickr_comments("pageId");
-CREATE INDEX idx_chart_hash ON stickr_comments("chartHash");
-CREATE INDEX idx_author ON stickr_comments(author);
+CREATE INDEX idx_page_id ON cognito_comments("pageId");
+CREATE INDEX idx_chart_hash ON cognito_comments("chartHash");
+CREATE INDEX idx_author ON cognito_comments(author);
 ```
 
 #### 4. Configure in Extension
@@ -178,7 +178,7 @@ chrome.storage.sync.set({ comments: backupData }, () => {
 - Verify the correct dashboard - comments are page-specific
 - If using database, check Supabase table in SQL Editor:
   ```sql
-  SELECT * FROM stickr_comments;
+  SELECT * FROM cognito_comments;
   ```
 
 ---
