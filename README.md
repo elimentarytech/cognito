@@ -40,6 +40,30 @@ Cognito is the context-sharing enhancement tool that eliminates the gap between 
    - Click the Cognito AI extension icon
    - Enter your email address to get started
 
+## 📸 Screenshots
+
+> **Note:** Create a `screenshots/` directory in the project root and add the following screenshot files:
+> - `onboarding-modal.png` - First-time onboarding experience
+> - `cognito-sidebar.png` - Cognito AI sidebar with comments
+> - `ai-configuration.png` - AI Configuration modal
+> - `settings-integrations.png` - Settings & Integrations modal
+
+### Onboarding Experience
+![Onboarding Modal](screenshots/onboarding-modal.png)
+*First-time setup: Enter your email and role to get started with Cognito AI*
+
+### Cognito AI Sidebar
+![Cognito AI Sidebar](screenshots/cognito-sidebar.png)
+*The Cognito AI sidebar showing comments with JIRA ticket integration. Add contextual notes, view AI insights, and link tickets directly from your dashboard.*
+
+### AI Configuration
+![AI Configuration](screenshots/ai-configuration.png)
+*Configure your AI provider (OpenAI, Anthropic, or Google Gemini) for intelligent chart analysis and insights.*
+
+### Settings & Integrations
+![Settings & Integrations](screenshots/settings-integrations.png)
+*Manage your database connections, JIRA integration, and AI configuration from one central location.*
+
 ## 🎮 How to Use
 
 ### Adding Comments

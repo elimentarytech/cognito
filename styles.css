@@ -797,28 +797,40 @@ body {
   
   .dc-select {
     flex: 1;
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem !important;
     border: 2px solid var(--stickr-border);
     border-radius: 0.5rem;
     font-size: 0.9rem;
     font-family: var(--stickr-font-family);
-    color: var(--stickr-foreground);
+    color: var(--stickr-foreground) !important;
     background: white;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
     cursor: pointer;
     transition: all 0.2s ease;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    -ms-appearance: none !important;
     z-index: 1000;
     position: relative;
+    height: 36px;
+    line-height: 20px;
+    box-sizing: border-box;
+    font-weight: 500;
   }
   
   .dc-select option {
     background: #ffffff;
     color: var(--stickr-foreground);
-    padding: 0.5rem;
+    padding: 0.5rem 0.75rem;
     display: block;
     visibility: visible;
+    line-height: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
   
   .dc-select:focus {
@@ -2201,6 +2213,7 @@ input:checked + .dc-slider:hover {
   font-size: 13px;
   background: #ffffff;
   height: 36px;
+  line-height: 20px;
   transition: all 0.2s ease;
   box-sizing: border-box;
   color: #374151 !important;
@@ -2219,13 +2232,17 @@ select.dc-form-input {
   position: relative;
   color: #1F2937 !important;
   font-weight: 500 !important;
-  padding-right: 2.5rem;
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem !important;
+  line-height: 20px !important;
+  height: 36px !important;
+  box-sizing: border-box !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23374151' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
   background-size: 1.25em 1.25em;
+  vertical-align: middle;
 }
 
 /* Force selected text to be visible */
@@ -2242,10 +2259,14 @@ select.dc-form-input.dc-select-empty {
 select.dc-form-input option {
   background: #ffffff !important;
   color: #374151 !important;
-  padding: 0.5rem;
+  padding: 0.5rem 0.75rem !important;
   display: block;
   visibility: visible;
   font-weight: 500 !important;
+  line-height: 20px !important;
+  font-size: 13px !important;
+  min-height: 36px !important;
+  height: auto !important;
 }
 
 select.dc-form-input option:checked {
@@ -2273,6 +2294,10 @@ select.dc-form-input:invalid {
 select.dc-form-input option {
   color: #1F2937 !important;
   background: #ffffff !important;
+  padding: 0.5rem 0.75rem !important;
+  line-height: 20px !important;
+  font-size: 13px !important;
+  min-height: 36px !important;
 }
 
 select.dc-form-input option:checked {
