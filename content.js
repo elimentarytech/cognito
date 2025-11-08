@@ -3032,8 +3032,8 @@ db.comments.createIndex({ "timestamp": -1 });
           <textarea class="dc-textarea" placeholder="Write your reply..." rows="4"></textarea>
           <div class="dc-form-row">
             <label>Type:</label>
-            <select class="dc-select" id="dc-reply-type">
-              <option value="comment">💬 Comment</option>
+            <select class="dc-select dc-form-input" id="dc-reply-type">
+              <option value="comment" selected>💬 Comment</option>
               <option value="note">📝 Note</option>
               <option value="rca">🔍 RCA</option>
               <option value="reference">📚 Reference</option>
@@ -3059,6 +3059,24 @@ db.comments.createIndex({ "timestamp": -1 });
       const textarea = dialog.querySelector('.dc-textarea');
       const typeSelect = dialog.querySelector('#dc-reply-type');
       const linkInput = dialog.querySelector('#dc-reply-link');
+      
+      // Initialize select to show default value properly
+      if (typeSelect) {
+        typeSelect.value = 'comment';
+        typeSelect.selectedIndex = 0;
+        typeSelect.style.color = '#1F2937';
+        typeSelect.style.fontWeight = '500';
+        // Force browser reflow to ensure display
+        void typeSelect.offsetWidth;
+        
+        // Ensure value is visible when changed
+        typeSelect.addEventListener('change', () => {
+          if (typeSelect.value) {
+            typeSelect.style.color = '#1F2937';
+            typeSelect.style.fontWeight = '500';
+          }
+        });
+      }
       
       textarea.focus();
       
@@ -3228,8 +3246,7 @@ db.comments.createIndex({ "timestamp": -1 });
               ${filterBadge}
           <div class="dc-comment-text">${this.escapeHtml(comment.text)}</div>
           ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-comment-link" target="_blank">🔗 View Reference</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 14px; height: 14px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 12px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
-              ${comment.jiraTicket ? console.log('🔍 Rendering Jira ticket for comment:', comment.id, 'jiraTicket:', comment.jiraTicket, 'url:', comment.jiraTicket.url, 'key:', comment.jiraTicket.key) : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-jira-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 14px; height: 14px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
           <div class="dc-comment-footer">
             <span class="dc-comment-author">👤 ${this.escapeHtml(comment.author)}</span>
               </div>
@@ -3548,7 +3565,7 @@ db.comments.createIndex({ "timestamp": -1 });
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 11px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -3662,7 +3679,7 @@ db.comments.createIndex({ "timestamp": -1 });
               </div>
               <div class="dc-bubble-comment-text">${this.escapeHtml(comment.text)}</div>
               ${comment.link ? `<a href="${this.escapeHtml(comment.link)}" class="dc-bubble-comment-link" target="_blank">🔗 Link</a>` : ''}
-              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a> ${comment.jiraTicket.summary ? `<span style="color: #6B7280; font-size: 11px; margin-left: 4px;">${this.escapeHtml(comment.jiraTicket.summary)}</span>` : ''}` : ''}
+              ${comment.jiraTicket ? `<a href="${this.escapeHtml(comment.jiraTicket.url || '#')}" class="dc-bubble-comment-link" target="_blank"><img src="${chrome.runtime.getURL('icons/atlassian.png')}" alt="Jira" style="width: 12px; height: 12px; vertical-align: middle;"> ${this.escapeHtml(comment.jiraTicket.key || 'Unknown')}</a>` : ''}
               <div class="dc-bubble-comment-author">👤 ${this.escapeHtml(comment.author)}</div>
             </div>
           </div>
@@ -4407,9 +4424,13 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
           const jiraUrl = `${this.jira.jiraUrl}/browse/${result.key}`;
           comment.jiraTicket = {
             key: result.key,
-            url: jiraUrl,
-            summary: result.summary || summary // Use summary from API response or fallback to input
+            url: jiraUrl
           };
+          // Only add summary if it has a valid value
+          const ticketSummary = result.summary || summary;
+          if (ticketSummary && ticketSummary.trim()) {
+            comment.jiraTicket.summary = ticketSummary;
+          }
           console.log('🔍 Creating Jira ticket for comment:', comment.id, 'result.key:', result.key, 'jira.jiraUrl:', this.jira.jiraUrl, 'constructed url:', jiraUrl, 'jiraTicket:', comment.jiraTicket);
           
           // Update existing comment (not insert)
@@ -4467,9 +4488,12 @@ ${comment.link ? `\nReference: ${this.escapeHtml(comment.link)}` : ''}</textarea
         // Update comment with Jira ticket info
         comment.jiraTicket = {
           key: ticketKey,
-          url: ticketUrl,
-          summary: ticketSummary || undefined // Store summary if available
+          url: ticketUrl
         };
+        // Only add summary if it has a valid value
+        if (ticketSummary && ticketSummary.trim()) {
+          comment.jiraTicket.summary = ticketSummary;
+        }
         console.log('🔍 Attaching Jira ticket to comment:', comment.id, 'ticketKey:', ticketKey, 'ticketUrl:', ticketUrl, 'jiraTicket:', comment.jiraTicket);
         
         // Update existing comment (not insert)
