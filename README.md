@@ -1,14 +1,14 @@
-# Stickr AI
+# Cognito AI
+Cognito: The Memory System for Your Data
 
-> AI-powered comments and notes for Power BI, Grafana and other dashboard visualizations
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/stickr-ai)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)]
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-yellow.svg)](https://chrome.google.com/webstore)
 
 ## 🎯 Overview
 
-Stickr AI is a powerful Chrome extension that transforms how teams collaborate on data dashboards. Add contextual comments, AI-powered insights, and Jira integration directly to your Power BI and Grafana visualizations.
+Cognito is the context-sharing enhancement tool that eliminates the gap between your data and the story behind it. We transform your existing dashboards from static monitors into live, collaborative knowledge bases. It is a powerful Chrome extension that transforms how teams collaborate on data dashboards. Add contextual comments, AI-powered insights, and Jira integration directly to your Power BI and Grafana visualizations.
 
 ### ✨ Key Features
 
@@ -26,18 +26,18 @@ Stickr AI is a powerful Chrome extension that transforms how teams collaborate o
 
 1. **Download the Extension**
    ```bash
-   git clone https://github.com/yourusername/stickr-ai.git
-   cd stickr-ai
+   git clone https://github.com/elimentarytech/cognito.git
+   cd cognito
    ```
 
 2. **Load in Chrome**
    - Open `chrome://extensions/`
    - Enable "Developer mode"
-   - Click "Load unpacked" and select the `stickr-ai` folder
+   - Click "Load unpacked" and select the `cognito` folder
 
 3. **First Launch**
    - Navigate to a Power BI or Grafana dashboard
-   - Click the Stickr AI extension icon
+   - Click the Cognito AI extension icon
    - Enter your email address to get started
 
 ## 🎮 How to Use
@@ -188,7 +188,7 @@ Stickr AI is a powerful Chrome extension that transforms how teams collaborate o
 
 ### Project Structure
 ```
-stickr-ai/
+cognito/
 ├── manifest.json          # Extension configuration
 ├── content.js             # Main extension logic
 ├── styles.css             # UI styling
@@ -212,8 +212,8 @@ stickr-ai/
 
 1. **Clone Repository**
    ```bash
-   git clone https://github.com/yourusername/stickr-ai.git
-   cd stickr-ai
+   git clone https://github.com/elimentarytech/cognito.git
+   cd cognito
    ```
 
 2. **Load in Chrome**
@@ -271,9 +271,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Quick Reference](QUICK_REFERENCE.md)
 
 ### Getting Help
-- **Issues**: [GitHub Issues](https://github.com/yourusername/stickr-ai/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/stickr-ai/discussions)
-- **Email**: support@stickr-ai.com
+- **Email**: engineering@elimentary.com
 
 ## 🗺️ Roadmap
 
@@ -285,23 +283,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] **Advanced AI**: Custom AI models for specific domains
 - [ ] **Mobile Support**: Mobile app for viewing comments
 
-### Platform Support
-- [ ] **Tableau**: Tableau dashboard support
-- [ ] **Looker**: Looker dashboard integration
-- [ ] **Metabase**: Metabase dashboard support
-- [ ] **Custom Dashboards**: Generic dashboard support
-
-## 🙏 Acknowledgments
-
-- **OpenAI** for GPT-4o-mini API
-- **Anthropic** for Claude API
-- **Supabase** for database hosting
-- **MongoDB** for Atlas cloud database
-- **Atlassian** for Jira API
-- **Chrome Extensions** team for the platform
-
----
-
 **Made with ❤️ for data teams everywhere**
 
-*Transform your dashboard collaboration with Stickr AI*
+*Transform your dashboard collaboration with Cognito AI*
