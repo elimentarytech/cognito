@@ -34,13 +34,18 @@ function obfuscateCode(code) {
   return code;
 }
 
-// Files to obfuscate
+// Files to obfuscate (exclude all files to preserve functionality - obfuscation breaks async/await and arrow functions)
 const filesToObfuscate = [
-  'content.js',
-  'background.js',
-  'popup.js',
+  // No files to obfuscate - obfuscation breaks async/await, arrow functions, and method names
+];
+
+// Files to copy without obfuscation (preserve all functionality)
+const filesToCopyAsIs = [
   'integrations.js',
-  'database.js'
+  'background.js',
+  'content.js',
+  'database.js',
+  'popup.js'
 ];
 
 // Create build directory
@@ -71,6 +76,17 @@ filesToCopy.forEach(file => {
     execSync(`cp "${srcPath}" "${destPath}"`);
   }
   console.log(`✅ Copied ${file}`);
+});
+
+// Copy JavaScript files that should not be obfuscated
+filesToCopyAsIs.forEach(file => {
+  const srcPath = path.join(__dirname, file);
+  const destPath = path.join(buildDir, file);
+  
+  if (fs.existsSync(srcPath)) {
+    execSync(`cp "${srcPath}" "${destPath}"`);
+    console.log(`✅ Copied ${file} (preserved for compatibility)`);
+  }
 });
 
 // Obfuscate JavaScript files
