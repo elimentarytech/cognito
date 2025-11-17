@@ -581,8 +581,32 @@ class DatabaseAdapter {
     try {
       switch (this.provider) {
         case 'supabase':
-          const { data, error } = await this.client.from('cognito_comments').insert([comment]);
+          // Create a cleaned comment object, excluding undefined/null fields that might not exist in schema
+          const cleanedComment = { ...comment };
+          // Remove undefined/null values for optional fields that might not be in schema yet
+          if (cleanedComment.targetId === undefined || cleanedComment.targetId === null) {
+            delete cleanedComment.targetId;
+          }
+          if (cleanedComment.targetPath === undefined || cleanedComment.targetPath === null) {
+            delete cleanedComment.targetPath;
+          }
+          
+          const { data, error } = await this.client.from('cognito_comments').insert([cleanedComment]);
           if (error) {
+            // If error is about missing columns, try again without them
+            if (error.message && (error.message.includes('targetId') || error.message.includes('targetPath'))) {
+              console.warn('⚠️ Schema missing targetId/targetPath columns, retrying without them');
+              delete cleanedComment.targetId;
+              delete cleanedComment.targetPath;
+              const retryResult = await this.client.from('cognito_comments').insert([cleanedComment]);
+              if (retryResult.error) {
+                console.error('Error saving comment after retry:', retryResult.error);
+                return null;
+              }
+              return retryResult.data && Array.isArray(retryResult.data) 
+                ? retryResult.data[0] || comment 
+                : retryResult.data || comment;
+            }
             console.error('Error saving comment:', error);
             return null;
           }
@@ -604,15 +628,15 @@ class DatabaseAdapter {
             INSERT INTO cognito_comments (
               id, text, link, "commentType", type, timestamp, author, 
               "pageId", "parentId", replies, "chartHash", "chartLabel", 
-              "relativeX", "relativeY"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+              "relativeX", "relativeY", "targetId", "targetPath"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING *
           `;
           const pgResult = await this.postgresRequest(pgQuery, [
             comment.id, comment.text, comment.link, comment.commentType, comment.type,
             comment.timestamp, comment.author, comment.pageId, comment.parentId,
             JSON.stringify(comment.replies), comment.chartHash, comment.chartLabel,
-            comment.relativeX, comment.relativeY
+            comment.relativeX, comment.relativeY, comment.targetId || null, comment.targetPath || null
           ]);
           return pgResult.rows ? pgResult.rows[0] : null;
           
@@ -621,14 +645,14 @@ class DatabaseAdapter {
             INSERT INTO cognito_comments (
               id, text, link, commentType, type, timestamp, author, 
               pageId, parentId, replies, chartHash, chartLabel, 
-              relativeX, relativeY
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              relativeX, relativeY, targetId, targetPath
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
           const mysqlResult = await this.mysqlRequest(mysqlQuery, [
             comment.id, comment.text, comment.link, comment.commentType, comment.type,
             comment.timestamp, comment.author, comment.pageId, comment.parentId,
             JSON.stringify(comment.replies), comment.chartHash, comment.chartLabel,
-            comment.relativeX, comment.relativeY
+            comment.relativeX, comment.relativeY, comment.targetId || null, comment.targetPath || null
           ]);
           return mysqlResult.affectedRows > 0 ? comment : null;
           

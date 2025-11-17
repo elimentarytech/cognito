@@ -66,8 +66,10 @@ CREATE TABLE cognito_comments (
   "chartLabel" TEXT,
   "relativeX" REAL,
   "relativeY" REAL,
-  "filterState" JSONB,  -- NEW: For filter-aware comments (Grafana)
-  "jiraTicket" JSONB    -- For Jira integration
+  "filterState" JSONB,  -- For filter-aware comments (Grafana)
+  "jiraTicket" JSONB,   -- For Jira integration
+  "targetId" TEXT,      -- For generic platform element identification
+  "targetPath" TEXT    -- CSS selector path for generic elements
 );
 
 -- Indexes for better performance
@@ -513,10 +515,12 @@ Current implementation uses **polling for all providers** for simplicity and con
 Run this SQL in the SQL Editor:
 
 ```sql
--- Add new columns for filter-aware comments and Jira integration
+-- Add new columns for filter-aware comments, Jira integration, and generic platform support
 ALTER TABLE cognito_comments 
 ADD COLUMN IF NOT EXISTS "filterState" JSONB,
-ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
+ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB,
+ADD COLUMN IF NOT EXISTS "targetId" TEXT,
+ADD COLUMN IF NOT EXISTS "targetPath" TEXT;
 ```
 
 ### For MongoDB Atlas Users
@@ -530,7 +534,9 @@ Run this SQL:
 ```sql
 ALTER TABLE cognito_comments 
 ADD COLUMN IF NOT EXISTS "filterState" JSONB,
-ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB;
+ADD COLUMN IF NOT EXISTS "jiraTicket" JSONB,
+ADD COLUMN IF NOT EXISTS "targetId" TEXT,
+ADD COLUMN IF NOT EXISTS "targetPath" TEXT;
 ```
 
 ### For MySQL Users
@@ -540,7 +546,9 @@ Run this SQL:
 ```sql
 ALTER TABLE cognito_comments 
 ADD COLUMN filterState JSON DEFAULT NULL,
-ADD COLUMN jiraTicket JSON DEFAULT NULL;
+ADD COLUMN jiraTicket JSON DEFAULT NULL,
+ADD COLUMN targetId VARCHAR(255) DEFAULT NULL,
+ADD COLUMN targetPath TEXT DEFAULT NULL;
 ```
 
 ### What These Fields Do
@@ -556,6 +564,18 @@ ADD COLUMN jiraTicket JSON DEFAULT NULL;
 - Example: `{"key": "PROJ-123", "url": "https://..."}`
 - Links comments to Jira issues
 - Optional: Only present when Jira ticket is created
+
+**`targetId`** (TEXT/VARCHAR):
+- Unique identifier for generic page elements (for non-Power BI/Grafana pages)
+- Example: `"cognito-lx123abc-xyz"`
+- Used to locate elements on generic web pages
+- Optional: Only present for comments on generic platforms
+
+**`targetPath`** (TEXT):
+- CSS selector path to the element (for generic pages)
+- Example: `"div>section>article"`
+- Fallback method to locate elements if targetId is not found
+- Optional: Only present for comments on generic platforms
 
 ### Verification
 

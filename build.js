@@ -1,62 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * Build script for Cognito AI Extension
- * Creates obfuscated and minified version for distribution
+ * Unified build script for Cognito AI Extension
+ * Supports: clean, production, and Chrome Store builds
+ * 
+ * Usage:
+ *   node build.js                    # Clean build (default)
+ *   node build.js --production       # Production build (minified, no console.log)
+ *   node build.js --chrome-store     # Chrome Store build (clean, optimized)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Simple obfuscation function
-function obfuscateCode(code) {
-  // Remove comments
-  code = code.replace(/\/\*[\s\S]*?\*\//g, '');
-  code = code.replace(/\/\/.*$/gm, '');
-  
-  // Minify by removing unnecessary whitespace
-  code = code.replace(/\s+/g, ' ');
-  code = code.replace(/\s*([{}();,=+\-*/])\s*/g, '$1');
-  
-  // Basic variable name obfuscation (simple approach)
-  const varMap = new Map();
-  let counter = 0;
-  
-  // Replace common variable names with shorter ones
-  code = code.replace(/\b(comment|chart|data|config|element|button|dialog|menu|sidebar|filter|bubble|jira|ai|integration|provider|api|key|url|token|storage|chrome|document|window|console|error|success|loading|visible|hidden|active|selected|current|previous|next|first|last|all|none|some|every|forEach|map|filter|reduce|find|includes|indexOf|push|pop|shift|unshift|splice|slice|join|split|replace|match|test|exec|toString|valueOf|hasOwnProperty|isPrototypeOf|propertyIsEnumerable|toLocaleString|constructor|prototype|__proto__|length|name|message|stack|cause|code|fileName|lineNumber|columnNumber|description|number|string|boolean|object|function|undefined|null|true|false|NaN|Infinity|isNaN|isFinite|parseInt|parseFloat|Number|String|Boolean|Object|Array|Date|RegExp|Error|TypeError|ReferenceError|SyntaxError|RangeError|EvalError|URIError|JSON|Math|Promise|async|await|then|catch|finally|resolve|reject|all|race|allSettled|any|finally|Symbol|Map|Set|WeakMap|WeakSet|Proxy|Reflect|Intl|Intl\.Collator|Intl\.DateTimeFormat|Intl\.NumberFormat|Intl\.PluralRules|Intl\.RelativeTimeFormat|Intl\.ListFormat|Intl\.Segmenter|Intl\.DisplayNames|Intl\.Locale|Intl\.getCanonicalLocales|Intl\.supportedValuesOf|Intl\.DateTimeFormat\.supportedLocalesOf|Intl\.NumberFormat\.supportedLocalesOf|Intl\.PluralRules\.supportedLocalesOf|Intl\.RelativeTimeFormat\.supportedLocalesOf|Intl\.ListFormat\.supportedLocalesOf|Intl\.Segmenter\.supportedLocalesOf|Intl\.DisplayNames\.supportedLocalesOf|Intl\.Collator\.supportedLocalesOf|Intl\.DateTimeFormat\.prototype\.format|Intl\.NumberFormat\.prototype\.format|Intl\.PluralRules\.prototype\.select|Intl\.RelativeTimeFormat\.prototype\.format|Intl\.ListFormat\.prototype\.format|Intl\.Segmenter\.prototype\.segment|Intl\.DisplayNames\.prototype\.of|Intl\.Collator\.prototype\.compare|Intl\.DateTimeFormat\.prototype\.formatToParts|Intl\.NumberFormat\.prototype\.formatToParts|Intl\.PluralRules\.prototype\.selectRange|Intl\.RelativeTimeFormat\.prototype\.formatToParts|Intl\.ListFormat\.prototype\.formatToParts|Intl\.Segmenter\.prototype\.segmentToParts|Intl\.DisplayNames\.prototype\.ofToParts|Intl\.Collator\.prototype\.compareToParts|Intl\.DateTimeFormat\.prototype\.resolvedOptions|Intl\.NumberFormat\.prototype\.resolvedOptions|Intl\.PluralRules\.prototype\.resolvedOptions|Intl\.RelativeTimeFormat\.prototype\.resolvedOptions|Intl\.ListFormat\.prototype\.resolvedOptions|Intl\.Segmenter\.prototype\.resolvedOptions|Intl\.DisplayNames\.prototype\.resolvedOptions|Intl\.Collator\.prototype\.resolvedOptions|Intl\.DateTimeFormat\.prototype\.formatRange|Intl\.NumberFormat\.prototype\.formatRange|Intl\.PluralRules\.prototype\.selectRange|Intl\.RelativeTimeFormat\.prototype\.formatRange|Intl\.ListFormat\.prototype\.formatRange|Intl\.Segmenter\.prototype\.segmentRange|Intl\.DisplayNames\.prototype\.ofRange|Intl\.Collator\.prototype\.compareRange|Intl\.DateTimeFormat\.prototype\.formatRangeToParts|Intl\.NumberFormat\.prototype\.formatRangeToParts|Intl\.PluralRules\.prototype\.selectRangeToParts|Intl\.RelativeTimeFormat\.prototype\.formatRangeToParts|Intl\.ListFormat\.prototype\.formatRangeToParts|Intl\.Segmenter\.prototype\.segmentRangeToParts|Intl\.DisplayNames\.prototype\.ofRangeToParts|Intl\.Collator\.prototype\.compareRangeToParts|Intl\.DateTimeFormat\.prototype\.formatToParts|Intl\.NumberFormat\.prototype\.formatToParts|Intl\.PluralRules\.prototype\.selectToParts|Intl\.RelativeTimeFormat\.prototype\.formatToParts|Intl\.ListFormat\.prototype\.formatToParts|Intl\.Segmenter\.prototype\.segmentToParts|Intl\.DisplayNames\.prototype\.ofToParts|Intl\.Collator\.prototype\.compareToParts|Intl\.DateTimeFormat\.prototype\.resolvedOptions|Intl\.NumberFormat\.prototype\.resolvedOptions|Intl\.PluralRules\.prototype\.resolvedOptions|Intl\.RelativeTimeFormat\.prototype\.resolvedOptions|Intl\.ListFormat\.prototype\.resolvedOptions|Intl\.Segmenter\.prototype\.resolvedOptions|Intl\.DisplayNames\.prototype\.resolvedOptions|Intl\.Collator\.prototype\.resolvedOptions|Intl\.DateTimeFormat\.prototype\.formatRange|Intl\.NumberFormat\.prototype\.formatRange|Intl\.PluralRules\.prototype\.selectRange|Intl\.RelativeTimeFormat\.prototype\.formatRange|Intl\.ListFormat\.prototype\.formatRange|Intl\.Segmenter\.prototype\.segmentRange|Intl\.DisplayNames\.prototype\.ofRange|Intl\.Collator\.prototype\.compareRange|Intl\.DateTimeFormat\.prototype\.formatRangeToParts|Intl\.NumberFormat\.prototype\.formatRangeToParts|Intl\.PluralRules\.prototype\.selectRangeToParts|Intl\.RelativeTimeFormat\.prototype\.formatRangeToParts|Intl\.ListFormat\.prototype\.formatRangeToParts|Intl\.Segmenter\.prototype\.segmentRangeToParts|Intl\.DisplayNames\.prototype\.ofRangeToParts|Intl\.Collator\.prototype\.compareRangeToParts)\b/g, (match) => {
-    if (!varMap.has(match)) {
-      varMap.set(match, `_${counter++}`);
-    }
-    return varMap.get(match);
-  });
-  
-  return code;
-}
+// Parse command line arguments
+const args = process.argv.slice(2);
+const isProduction = args.includes('--production');
+const isChromeStore = args.includes('--chrome-store');
+const mode = isChromeStore ? 'chrome-store' : (isProduction ? 'production' : 'clean');
 
-// Files to obfuscate (exclude all files to preserve functionality - obfuscation breaks async/await and arrow functions)
-const filesToObfuscate = [
-  // No files to obfuscate - obfuscation breaks async/await, arrow functions, and method names
-];
+console.log(`🔨 Building Cognito AI Extension (${mode} mode)...\n`);
 
-// Files to copy without obfuscation (preserve all functionality)
-const filesToCopyAsIs = [
-  'integrations.js',
-  'background.js',
-  'content.js',
-  'database.js',
-  'popup.js'
-];
-
-// Create build directory
-const buildDir = path.join(__dirname, 'build');
-if (!fs.existsSync(buildDir)) {
-  fs.mkdirSync(buildDir);
-}
-
-console.log('🔨 Building Cognito AI Extension...');
-
-// Copy all files to build directory
+// Files to copy (all modes)
 const filesToCopy = [
   'manifest.json',
   'popup.html',
@@ -66,50 +32,151 @@ const filesToCopy = [
   'generated-image-Photoroom.png'
 ];
 
+// JavaScript files to process
+const jsFiles = [
+  'background.js',
+  'content.js',
+  'popup.js',
+  'integrations.js',
+  'database.js'
+];
+
+// Simple minification (removes comments, extra whitespace)
+function minify(code) {
+  // Remove comments
+  code = code.replace(/\/\*[\s\S]*?\*\//g, '');
+  code = code.replace(/\/\/.*$/gm, '');
+  
+  // Basic minification (preserve newlines for readability in clean mode)
+  if (isProduction || isChromeStore) {
+    code = code.replace(/\s+/g, ' ');
+    code = code.replace(/\s*([{}();,=+\-*/])\s*/g, '$1');
+  } else {
+    // Just remove trailing whitespace
+    code = code.replace(/[ \t]+$/gm, '');
+  }
+  
+  return code;
+}
+
+// Production processing (removes console.log)
+function processForProduction(code) {
+  // Remove console statements
+  code = code.replace(/console\.(log|debug|info)\([^)]*\);?/g, '');
+  // Keep console.error and console.warn for debugging
+  return code;
+}
+
+// Create build directory
+const buildDir = path.join(__dirname, 'build');
+if (fs.existsSync(buildDir)) {
+  console.log('🧹 Cleaning build directory...');
+  execSync(`rm -rf "${buildDir}"`);
+}
+fs.mkdirSync(buildDir, { recursive: true });
+
+// Copy static files
+console.log('\n📋 Copying static files...');
 filesToCopy.forEach(file => {
   const srcPath = path.join(__dirname, file);
   const destPath = path.join(buildDir, file);
   
-  if (fs.statSync(srcPath).isDirectory()) {
-    execSync(`cp -r "${srcPath}" "${destPath}"`);
+  if (fs.existsSync(srcPath)) {
+    if (fs.statSync(srcPath).isDirectory()) {
+      execSync(`cp -r "${srcPath}" "${destPath}"`);
+    } else {
+      // Ensure parent directory exists
+      const destDir = path.dirname(destPath);
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+      fs.copyFileSync(srcPath, destPath);
+    }
+    console.log(`  ✅ ${file}`);
   } else {
-    execSync(`cp "${srcPath}" "${destPath}"`);
-  }
-  console.log(`✅ Copied ${file}`);
-});
-
-// Copy JavaScript files that should not be obfuscated
-filesToCopyAsIs.forEach(file => {
-  const srcPath = path.join(__dirname, file);
-  const destPath = path.join(buildDir, file);
-  
-  if (fs.existsSync(srcPath)) {
-    execSync(`cp "${srcPath}" "${destPath}"`);
-    console.log(`✅ Copied ${file} (preserved for compatibility)`);
+    console.warn(`  ⚠️  ${file} not found, skipping`);
   }
 });
 
-// Obfuscate JavaScript files
-filesToObfuscate.forEach(file => {
+// Process JavaScript files
+console.log('\n📝 Processing JavaScript files...');
+jsFiles.forEach(file => {
   const srcPath = path.join(__dirname, file);
   const destPath = path.join(buildDir, file);
   
-  if (fs.existsSync(srcPath)) {
-    const code = fs.readFileSync(srcPath, 'utf8');
-    const obfuscatedCode = obfuscateCode(code);
-    fs.writeFileSync(destPath, obfuscatedCode);
-    console.log(`🔒 Obfuscated ${file}`);
+  if (!fs.existsSync(srcPath)) {
+    console.warn(`  ⚠️  ${file} not found, skipping`);
+    return;
   }
+  
+  let code = fs.readFileSync(srcPath, 'utf8');
+  
+  if (isProduction || isChromeStore) {
+    // Minify and remove console.log for production/Chrome Store
+    code = minify(code);
+    if (isProduction) {
+      code = processForProduction(code);
+    }
+    console.log(`  ✅ ${file} (minified)`);
+  } else {
+    // Clean mode: just copy as-is
+    console.log(`  ✅ ${file} (clean)`);
+  }
+  
+  // Ensure parent directory exists
+  const destDir = path.dirname(destPath);
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  
+  fs.writeFileSync(destPath, code);
 });
 
 // Create distribution package
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir);
+  fs.mkdirSync(distDir, { recursive: true });
 }
 
-execSync(`cd "${buildDir}" && zip -r "../dist/cognito-ai-extension-obfuscated.zip" . -x "*.DS_Store"`);
+// Determine zip name based on mode
+const zipName = isChromeStore 
+  ? 'cognito-ai-extension-chrome-store.zip'
+  : isProduction 
+    ? 'cognito-ai-extension-production.zip'
+    : 'cognito-ai-extension-clean.zip';
 
-console.log('✅ Build complete!');
-console.log('📦 Distribution package: dist/cognito-ai-extension-obfuscated.zip');
-console.log('🔒 Code has been obfuscated for protection');
+const zipPath = path.join(distDir, zipName);
+
+// Remove old zip if exists
+if (fs.existsSync(zipPath)) {
+  fs.unlinkSync(zipPath);
+}
+
+console.log('\n📦 Creating distribution package...');
+
+// Create zip from build directory (manifest.json at root)
+process.chdir(buildDir);
+try {
+  execSync(`zip -r "${zipPath}" . -x "*.DS_Store" "*.git*" "node_modules/*"`, { stdio: 'inherit' });
+  console.log(`\n✅ Build complete!`);
+  console.log(`📦 Package: ${zipPath}`);
+  
+  if (isChromeStore) {
+    console.log('\n✨ Ready for Chrome Web Store submission!');
+    console.log('📋 Next steps:');
+    console.log('   1. Go to Chrome Web Store Developer Dashboard');
+    console.log('   2. Upload the zip file');
+    console.log('   3. Fill in store listing details');
+  } else if (isProduction) {
+    console.log('\n🔒 Production build: Code minified, console.log removed');
+  } else {
+    console.log('\n🔧 Clean build: Unminified code for development');
+  }
+} catch (error) {
+  console.error('\n❌ Error creating zip file:', error.message);
+  console.log('\n💡 Tip: Make sure you have zip command installed');
+  console.log('   macOS: Already installed');
+  console.log('   Linux: sudo apt-get install zip');
+  console.log('   Windows: Install Git Bash or use PowerShell Compress-Archive');
+  process.exit(1);
+}

@@ -3,13 +3,11 @@
   "version": "1.0.0",
   "description": "Super charge your static dashboards with context, knowledge and Intelligence",
   "scripts": {
-    "build": "node build-advanced.js",
-    "build-simple": "node build-simple.js",
-    "build-production": "node build-production.js",
-    "build-debug": "node build-debug.js",
-    "build-minimal": "node build-minimal.js",
-    "build-clean": "node build-clean.js",
-    "package": "npm run build-clean && cd dist && zip -r cognito-ai-extension-final.zip ."
+    "build": "node build.js",
+    "build:clean": "node build.js",
+    "build:production": "node build.js --production",
+    "build:chrome-store": "node build.js --chrome-store",
+    "package": "node package-for-chrome-store.js"
   },
   "devDependencies": {
     "javascript-obfuscator": "^4.1.1",

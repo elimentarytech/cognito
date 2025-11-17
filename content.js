@@ -4,6 +4,7 @@ class Stickr {
       this.isAddingComment = false;
       this.comments = [];
     this.platform = this.detectPlatform();
+      this.genericTargetAttribute = 'data-stickr-target-id';
       this.currentPageId = this.generatePageId();
       this.sidebar = null;
     this.bubbleMap = new Map(); // Map: chartHash -> {bubble, chartElement, comments}
@@ -126,8 +127,8 @@ class Stickr {
           return 'powerbi';
         }
         
-        console.log('⚠️ Platform unknown, defaulting to generic');
-        return 'unknown';
+        console.log('⚠️ Platform unknown, using generic mode');
+        return 'generic';
       };
       
       return checkStructure();
@@ -527,7 +528,9 @@ class Stickr {
   "relativeX" REAL,
   "relativeY" REAL,
   "filterState" JSONB,
-  "jiraTicket" JSONB
+  "jiraTicket" JSONB,
+  "targetId" TEXT,
+  "targetPath" TEXT
 );</pre>
                       </div>
                     </li>
@@ -2028,7 +2031,7 @@ db.comments.createIndex({ "timestamp": -1 });
           }
         }
         
-      } else {
+      } else if (this.platform === 'powerbi') {
         // Power BI-specific identification
       
       // Strategy 1: Look for visualContainerGroup with name attribute (MOST RELIABLE!)
@@ -2101,6 +2104,32 @@ db.comments.createIndex({ "timestamp": -1 });
         const allContainers = document.querySelectorAll('.visualContainerGroup, .visualContainer');
         const index = Array.from(allContainers).indexOf(containerGroup || visualContainer);
         if (index >= 0) identifiers.push(`pos:${index}`);
+        }
+      } else {
+        // Generic fallback identification
+        const targetId = this.ensureGenericTargetId(element);
+        if (targetId) {
+          identifiers.push(`target:${targetId}`);
+        }
+
+        const path = this.getElementPath(element);
+        if (path) {
+          identifiers.push(`path:${path}`);
+        }
+
+        const role = element.getAttribute('role');
+        if (role) {
+          identifiers.push(`role:${role}`);
+        }
+
+        const dataTestId = element.getAttribute('data-testid');
+        if (dataTestId) {
+          identifiers.push(`testid:${dataTestId}`);
+        }
+
+        if (identifiers.length === 0) {
+          const rect = element.getBoundingClientRect();
+          identifiers.push(`bounds:${Math.round(rect.x)}_${Math.round(rect.y)}_${Math.round(rect.width)}_${Math.round(rect.height)}`);
         }
       }
       
@@ -2181,43 +2210,50 @@ db.comments.createIndex({ "timestamp": -1 });
             }
           }
         }
-      } else {
-      // Power BI specific selectors (based on actual structure)
-      const chartSelectors = [
-        '.visualContainerGroup',      // Parent group with name attribute (BEST!)
-        '.visualContainer',           // Main visual container
-        'visual-modern',              // Visual component
-        '.cartesianChart',            // SVG charts
-        'svg[name]',                  // Named SVG elements
-        '.visual'                     // Visual wrapper
-      ];
-      
-      for (const element of elements) {
-        // First priority: visualContainerGroup (has the stable name attribute)
-        const containerGroup = element.closest('.visualContainerGroup');
-        if (containerGroup) {
-          console.log('✓ Found visualContainerGroup at click position');
-          return containerGroup;
-        }
+      } else if (this.platform === 'powerbi') {
+        // Power BI specific selectors (based on actual structure)
+        const chartSelectors = [
+          '.visualContainerGroup',      // Parent group with name attribute (BEST!)
+          '.visualContainer',           // Main visual container
+          'visual-modern',              // Visual component
+          '.cartesianChart',            // SVG charts
+          'svg[name]',                  // Named SVG elements
+          '.visual'                     // Visual wrapper
+        ];
         
-        // Second priority: visualContainer
-        const container = element.closest('.visualContainer');
-        if (container) {
-          console.log('✓ Found visualContainer at click position');
-          return container;
-        }
-        
-        // Try other selectors
-        for (const selector of chartSelectors) {
-          const chart = element.closest(selector);
-          if (chart) {
-            // Try to return the parent container
-            const parent = chart.closest('.visualContainerGroup') || 
-                          chart.closest('.visualContainer');
-            if (parent) return parent;
-            return chart;
+        for (const element of elements) {
+          // First priority: visualContainerGroup (has the stable name attribute)
+          const containerGroup = element.closest('.visualContainerGroup');
+          if (containerGroup) {
+            console.log('✓ Found visualContainerGroup at click position');
+            return containerGroup;
+          }
+          
+          // Second priority: visualContainer
+          const container = element.closest('.visualContainer');
+          if (container) {
+            console.log('✓ Found visualContainer at click position');
+            return container;
+          }
+          
+          // Try other selectors
+          for (const selector of chartSelectors) {
+            const chart = element.closest(selector);
+            if (chart) {
+              // Try to return the parent container
+              const parent = chart.closest('.visualContainerGroup') || 
+                            chart.closest('.visualContainer');
+              if (parent) return parent;
+              return chart;
+              }
             }
           }
+      } else {
+        const genericTarget = this.findGenericTargetFromElements(elements);
+        if (genericTarget) {
+          this.ensureGenericTargetId(genericTarget);
+          console.log('✓ Found generic target element at click position');
+          return genericTarget;
         }
       }
       
@@ -2227,39 +2263,38 @@ db.comments.createIndex({ "timestamp": -1 });
   
     // Get human-readable chart name
     getChartLabel(element) {
+      if (!element) {
+        return 'Page Element';
+      }
+
       if (this.platform === 'grafana') {
-        // Grafana: Look for panel title - very flexible
-        // Priority 1: Any h1-h6 with title attribute
         const titleElements = element.querySelectorAll('h1[title], h2[title], h3[title], h4[title], h5[title], h6[title]');
         if (titleElements.length > 0) {
           const titleText = titleElements[0].getAttribute('title') || titleElements[0].textContent.trim();
           if (titleText) return titleText;
         }
-        
-        // Priority 2: Panel title classes (various Grafana versions)
+
         const titleSelectors = [
           '.panel-title',
           '[class*="panel-title"]',
           '[class*="PanelHeader"]',
           '[data-testid*="panel-header"]'
         ];
-        
+
         for (const selector of titleSelectors) {
           const titleEl = element.querySelector(selector);
           if (titleEl) {
             const text = titleEl.textContent.trim();
-            if (text && text.length < 100) return text; // Reasonable length check
+            if (text && text.length < 100) return text;
           }
         }
-        
-        // Priority 3: data-testid with panel name
+
         const testId = element.getAttribute('data-testid');
         if (testId && testId.includes('Panel')) {
           const match = testId.match(/Panel\s+(?:header\s+)?(.+)/i);
           if (match) return match[1];
         }
-        
-        // Priority 4: Search for testid in descendants
+
         const testIdEl = element.querySelector('[data-testid*="Panel"]');
         if (testIdEl) {
           const tid = testIdEl.getAttribute('data-testid');
@@ -2268,8 +2303,7 @@ db.comments.createIndex({ "timestamp": -1 });
             if (match) return match[1];
           }
         }
-        
-        // Priority 5: aria-labelledby
+
         const ariaLabelId = element.getAttribute('aria-labelledby');
         if (ariaLabelId) {
           const labelEl = document.getElementById(ariaLabelId);
@@ -2277,64 +2311,85 @@ db.comments.createIndex({ "timestamp": -1 });
             return labelEl.textContent.trim();
           }
         }
-        
-        // Priority 6: Any heading element
+
         const anyHeading = element.querySelector('h1, h2, h3, h4');
         if (anyHeading) {
           const text = anyHeading.textContent.trim();
           if (text && text.length < 100) return text;
         }
-        
+
         return 'Grafana Panel';
-      } else {
-        // Power BI: Original logic
-        // Priority 1: Look for chart title in content div with ui-role-button-text class
+      }
+
+      if (this.platform === 'powerbi') {
         const titleDiv = element.querySelector('.content.text.ui-role-button-text') || 
                          element.closest('.visualContainer')?.querySelector('.content.text.ui-role-button-text');
         if (titleDiv && titleDiv.textContent.trim()) {
           return titleDiv.textContent.trim();
         }
-        
-        // Priority 2: Get from visualContainerGroup aria-label
-      const containerGroup = element.closest('.visualContainerGroup') || 
-                            element.querySelector('.visualContainerGroup');
-      if (containerGroup) {
-        const ariaLabel = containerGroup.getAttribute('aria-label');
-        // aria-label might say "3 items" or similar, check if it's useful
-        if (ariaLabel && !ariaLabel.match(/^\d+\s+item/i)) {
-          return ariaLabel;
+
+        const containerGroup = element.closest('.visualContainerGroup') || 
+                              element.querySelector('.visualContainerGroup');
+        if (containerGroup) {
+          const ariaLabel = containerGroup.getAttribute('aria-label');
+          if (ariaLabel && !ariaLabel.match(/^\d+\s+item/i)) {
+            return ariaLabel.trim();
+          }
         }
-      }
-      
-        // Priority 3: SVG name (chart type)
-      const svg = element.querySelector('svg[name]') || element.closest('svg[name]');
-      if (svg) {
-        const name = svg.getAttribute('name');
-        if (name) return name;
-      }
-      
-        // Priority 4: Visual type from class
-      const visualDiv = element.querySelector('[class*="visual-"]');
-      if (visualDiv) {
-        const visualClass = Array.from(visualDiv.classList)
-          .find(c => c.startsWith('visual-'));
-        if (visualClass) {
-          return visualClass
-            .replace('visual-', '')
-            .replace(/([A-Z])/g, ' $1')
-            .trim()
-            .replace(/^./, str => str.toUpperCase());
+
+        const svg = element.querySelector('svg[name]') || element.closest('svg[name]');
+        if (svg) {
+          const name = svg.getAttribute('name');
+          if (name) return name;
         }
+
+        const visualDiv = element.querySelector('[class*="visual-"]');
+        if (visualDiv) {
+          const visualClass = Array.from(visualDiv.classList)
+            .find(c => c.startsWith('visual-'));
+          if (visualClass) {
+            return visualClass
+              .replace('visual-', '')
+              .replace(/([A-Z])/g, ' $1')
+              .trim()
+              .replace(/^./, str => str.toUpperCase());
+          }
+        }
+
+        const firstLegend = element.querySelector('.legend-item-text');
+        if (firstLegend) {
+          return `Chart: ${firstLegend.textContent.trim()}`;
+        }
+
+        const titleElement = element.querySelector('[title]');
+        if (titleElement && titleElement.getAttribute('title')) {
+          return titleElement.getAttribute('title');
+        }
+
+        return 'Visual Chart';
       }
-      
-        // Priority 5: First legend item
-      const firstLegend = element.querySelector('.legend-item-text');
-      if (firstLegend) {
-        return `Chart: ${firstLegend.textContent.trim()}`;
+
+      const ariaLabel = element.getAttribute('aria-label');
+      if (ariaLabel && ariaLabel.trim()) {
+        return ariaLabel.trim();
       }
-      
-      return 'Visual Chart';
+
+      const titleAttr = element.getAttribute('title');
+      if (titleAttr && titleAttr.trim()) {
+        return titleAttr.trim();
       }
+
+      const textContent = element.textContent ? element.textContent.trim() : '';
+      if (textContent) {
+        const condensed = textContent.replace(/\s+/g, ' ');
+        if (condensed.length > 80) {
+          return `${condensed.substring(0, 77)}...`;
+        }
+        return condensed;
+      }
+
+      const selector = this.getElementPath(element) || element.tagName.toLowerCase();
+      return selector || 'Page Element';
     }
   
     // Inject sidebar
@@ -2575,6 +2630,8 @@ db.comments.createIndex({ "timestamp": -1 });
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (request.action === 'toggleSidebar') {
             this.toggleSidebar();
+          } else if (request.action === 'ping') {
+            sendResponse({ status: 'ready', platform: this.platform, pageId: this.currentPageId });
           }
         });
       }
@@ -2836,7 +2893,10 @@ db.comments.createIndex({ "timestamp": -1 });
       // Show overlay
       const overlay = document.createElement('div');
       overlay.className = 'dc-click-overlay';
-      overlay.innerHTML = '<div class="dc-overlay-text">🎯 Click on any chart to add a comment<br><small style="opacity: 0.7;">Press ESC to cancel</small></div>';
+      const instructionText = this.platform === 'generic'
+        ? '🎯 Click anywhere on the page to add a comment'
+        : '🎯 Click on any chart to add a comment';
+      overlay.innerHTML = `<div class="dc-overlay-text">${instructionText}<br><small style="opacity: 0.7;">Press ESC to cancel</small></div>`;
       document.body.appendChild(overlay);
       
       // Cancel on Escape
@@ -2861,7 +2921,10 @@ db.comments.createIndex({ "timestamp": -1 });
       const chart = this.findChartAtPosition(e.clientX, e.clientY);
       
       if (!chart) {
-        alert('⚠️ Please click directly on a chart visualization\n\nTip: Click on the chart area, not on empty space.');
+        const warning = this.platform === 'generic'
+          ? '⚠️ Please click directly on the part of the page you want to annotate.\n\nTip: Click on the content itself, not on empty space or browser controls.'
+          : '⚠️ Please click directly on a chart visualization\n\nTip: Click on the chart area, not on empty space.';
+        alert(warning);
         return;
       }
   
@@ -2876,6 +2939,8 @@ db.comments.createIndex({ "timestamp": -1 });
       
       // Get chart context
       const chartLabel = this.getChartLabel(chart);
+      const targetId = this.ensureGenericTargetId(chart);
+      const targetPath = this.getElementPath(chart);
       
       console.log('Creating comment for chart:', chartLabel, 'Hash:', chartHash);
       
@@ -2885,7 +2950,9 @@ db.comments.createIndex({ "timestamp": -1 });
         chartLabel,
         relativeX,
         relativeY,
-        pageId: this.currentPageId
+        pageId: this.currentPageId,
+        targetId,
+        targetPath
       });
     }
   
@@ -3114,7 +3181,9 @@ db.comments.createIndex({ "timestamp": -1 });
           chartHash: parentComment.chartHash, // Inherit chart hash for bubble comments
           chartLabel: parentComment.chartLabel,
           x: parentComment.x,
-          y: parentComment.y
+          y: parentComment.y,
+          targetId: parentComment.targetId,
+          targetPath: parentComment.targetPath
         };
         
         this.saveComment(reply);
@@ -3399,16 +3468,14 @@ db.comments.createIndex({ "timestamp": -1 });
       });
     }
   
-    // Render bubble comments on charts
+    // Render bubble comments on charts or generic elements
     renderBubbles() {
       let bubbleComments = this.comments.filter(
         c => c.type === 'bubble' && c.pageId === this.currentPageId
       );
-      
-      // For Grafana: filter by current filter state
+
       if (this.platform === 'grafana' && this.currentFilterState) {
         bubbleComments = bubbleComments.filter(comment => {
-          // Show comment if it matches current filter state
           const matches = this.filtersMatch(comment.filterState, this.currentFilterState);
           if (!matches) {
             console.log('🚫 Hiding comment (filter mismatch):', {
@@ -3420,10 +3487,9 @@ db.comments.createIndex({ "timestamp": -1 });
           return matches;
         });
       }
-      
+
       console.log('🎯 Rendering', bubbleComments.length, 'bubble comments for page:', this.currentPageId);
-      
-      // Group comments by chartHash
+
       const commentsByChart = {};
       bubbleComments.forEach(comment => {
         if (!commentsByChart[comment.chartHash]) {
@@ -3431,82 +3497,71 @@ db.comments.createIndex({ "timestamp": -1 });
         }
         commentsByChart[comment.chartHash].push(comment);
       });
-      
-      console.log('📊 Grouped into', Object.keys(commentsByChart).length, 'charts');
-      
-      // Find all chart elements on the page
-      const chartSelectors = this.platform === 'grafana' 
+
+      console.log('📊 Grouped into', Object.keys(commentsByChart).length, 'targets');
+
+      if (this.platform !== 'grafana' && this.platform !== 'powerbi') {
+        this.renderGenericBubbles(commentsByChart);
+        return;
+      }
+
+      const chartSelectors = this.platform === 'grafana'
         ? '[data-viz-panel-key], .panel-container, section[aria-labelledby], .react-grid-item, [class*="react-grid-item"], [data-panelid], [class*="panel-"]'
         : '.visualContainerGroup, .visualContainer';
       const charts = document.querySelectorAll(chartSelectors);
-      
-      // Track which hashes have current elements
+
       const currentHashes = new Set();
-      
-      // Process each chart element
+
       charts.forEach(chart => {
         const chartHash = this.generateChartHash(chart);
         const comments = commentsByChart[chartHash];
-        
+
         if (comments && comments.length > 0) {
           currentHashes.add(chartHash);
-          
-          // Check if bubble already exists for this hash
+
           const existing = this.bubbleMap.get(chartHash);
-          
+
           if (existing) {
-            // Check if element reference changed (Grafana re-renders on scroll)
             if (existing.chartElement !== chart) {
               console.log('📍 Chart element changed for hash:', chartHash);
               console.log('  Old element in DOM:', document.contains(existing.chartElement));
               console.log('  New element in DOM:', document.contains(chart));
-              
-              // Stop observing old element
+
               if (this.resizeObserver && document.contains(existing.chartElement)) {
                 this.resizeObserver.unobserve(existing.chartElement);
               }
-              
-              // Update element reference
+
               existing.chartElement = chart;
-              
-              // Start observing new element
+
               if (this.resizeObserver) {
                 this.resizeObserver.observe(chart);
               }
             }
-            
-            // Update bubble content and position
+
             this.updateChartBubble(chart, comments, chartHash);
           } else {
-            // Create new bubble
             console.log('🆕 Creating new bubble for hash:', chartHash);
             this.createChartBubble(chart, comments, chartHash);
           }
         }
       });
-      
-      // Clean up bubbles ONLY if comments were actually deleted (not just chart missing)
+
       for (const [chartHash, data] of this.bubbleMap.entries()) {
-        // Check if this chartHash still has comments in storage
         const hasComments = commentsByChart[chartHash] && commentsByChart[chartHash].length > 0;
-        
+
         if (!hasComments) {
-          // Comments were deleted, remove bubble
           console.log('🗑️ Removing bubble - comments deleted for hash:', chartHash);
           data.bubble.remove();
-          
-          // Stop observing this element
+
           if (this.resizeObserver && document.contains(data.chartElement)) {
             this.resizeObserver.unobserve(data.chartElement);
           }
-          
+
           this.bubbleMap.delete(chartHash);
         } else if (!currentHashes.has(chartHash)) {
-          // Has comments but chart element not found - just hide the bubble temporarily
           console.log('⏸️ Hiding bubble - chart element not found (may be re-rendering):', chartHash);
           data.bubble.style.display = 'none';
         } else {
-          // Make sure bubble is visible if chart is found
           data.bubble.style.display = '';
         }
       }
@@ -4725,6 +4780,195 @@ Provide a clear, concise analysis.${userRoleContext}`);
         });
       } catch (e) {
         console.warn('ensureSidebarUIVisibility failed:', e);
+      }
+    }
+
+    ensureGenericTargetId(element, preferredId = null) {
+      if (!element || typeof element.getAttribute !== 'function') {
+        return null;
+      }
+
+      let existing = element.getAttribute(this.genericTargetAttribute);
+      if (!existing) {
+        existing = preferredId || `cognito-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        element.setAttribute(this.genericTargetAttribute, existing);
+      }
+
+      return existing;
+    }
+
+    isInternalElement(element) {
+      if (!element || element.nodeType !== 1) {
+        return false;
+      }
+
+      const internalPrefixes = ['dc-', 'stickr-'];
+
+      if (element.id && internalPrefixes.some(prefix => element.id.startsWith(prefix))) {
+        return true;
+      }
+
+      if (element.classList && Array.from(element.classList).some(cls => internalPrefixes.some(prefix => cls.startsWith(prefix)))) {
+        return true;
+      }
+
+      if (element.getAttribute && element.getAttribute('data-stickr-component')) {
+        return true;
+      }
+
+      return false;
+    }
+
+    findGenericTargetFromElements(elements) {
+      if (!elements || elements.length === 0) {
+        return null;
+      }
+
+      const allowedTags = ['ARTICLE', 'SECTION', 'DIV', 'MAIN', 'HEADER', 'FOOTER', 'ASIDE', 'NAV', 'TABLE', 'FIGURE', 'LI', 'P', 'UL', 'OL', 'IMG', 'CANVAS'];
+      let fallback = null;
+
+      for (const element of elements) {
+        if (!element || element.nodeType !== 1) {
+          continue;
+        }
+
+        if (['HTML', 'HEAD'].includes(element.tagName)) {
+          continue;
+        }
+
+        if (this.isInternalElement(element)) {
+          continue;
+        }
+
+        if (!fallback && element.tagName !== 'BODY') {
+          fallback = element;
+        }
+
+        let candidate = element;
+
+        while (candidate && candidate !== document.body) {
+          if (this.isInternalElement(candidate)) {
+            candidate = candidate.parentElement;
+            continue;
+          }
+
+          if (candidate.hasAttribute && candidate.hasAttribute(this.genericTargetAttribute)) {
+            return candidate;
+          }
+
+          if (allowedTags.includes(candidate.tagName) || candidate.getAttribute('role')) {
+            return candidate;
+          }
+
+          candidate = candidate.parentElement;
+        }
+      }
+
+      if (fallback && !this.isInternalElement(fallback)) {
+        return fallback;
+      }
+
+      return null;
+    }
+
+    resolveGenericElement(targetId, targetPath) {
+      let element = null;
+
+      if (targetId) {
+        element = document.querySelector(`[${this.genericTargetAttribute}="${targetId}"]`);
+        if (element) {
+          return element;
+        }
+      }
+
+      if (targetPath) {
+        try {
+          element = document.querySelector(targetPath);
+          if (element) {
+            this.ensureGenericTargetId(element, targetId);
+            return element;
+          }
+        } catch (error) {
+          console.warn('Failed to resolve generic element by path:', error);
+        }
+      }
+
+      return null;
+    }
+
+    findGenericElementForComment(comment) {
+      if (!comment) {
+        return null;
+      }
+
+      const element = this.resolveGenericElement(comment.targetId, comment.targetPath);
+      if (element) {
+        this.ensureGenericTargetId(element, comment.targetId);
+      }
+
+      return element;
+    }
+
+    renderGenericBubbles(commentsByChart) {
+      const currentHashes = new Set();
+
+      Object.entries(commentsByChart).forEach(([chartHash, comments]) => {
+        if (!comments || comments.length === 0) {
+          return;
+        }
+
+        const targetElement = this.findGenericElementForComment(comments[0]);
+
+        if (!targetElement) {
+          console.log('⚠️ Generic target not found for hash, keeping comments but hiding bubble if present:', chartHash);
+          const existing = this.bubbleMap.get(chartHash);
+          if (existing) {
+            existing.bubble.style.display = 'none';
+          }
+          return;
+        }
+
+        this.ensureGenericTargetId(targetElement, comments[0].targetId);
+        currentHashes.add(chartHash);
+
+        const existing = this.bubbleMap.get(chartHash);
+
+        if (existing) {
+          if (existing.chartElement !== targetElement) {
+            if (this.resizeObserver && document.contains(existing.chartElement)) {
+              this.resizeObserver.unobserve(existing.chartElement);
+            }
+
+            existing.chartElement = targetElement;
+
+            if (this.resizeObserver) {
+              this.resizeObserver.observe(targetElement);
+            }
+          }
+
+          this.updateChartBubble(targetElement, comments, chartHash);
+        } else {
+          console.log('🆕 Creating generic bubble for hash:', chartHash);
+          this.createChartBubble(targetElement, comments, chartHash);
+        }
+      });
+
+      for (const [chartHash, data] of this.bubbleMap.entries()) {
+        const hasComments = commentsByChart[chartHash] && commentsByChart[chartHash].length > 0;
+
+        if (!hasComments) {
+          data.bubble.remove();
+
+          if (this.resizeObserver && document.contains(data.chartElement)) {
+            this.resizeObserver.unobserve(data.chartElement);
+          }
+
+          this.bubbleMap.delete(chartHash);
+        } else if (!currentHashes.has(chartHash)) {
+          data.bubble.style.display = 'none';
+        } else {
+          data.bubble.style.display = '';
+        }
       }
     }
   }

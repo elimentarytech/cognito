@@ -1,53 +1,34 @@
 #!/usr/bin/env node
 
 /**
- * Package script for Chrome Web Store submission
- * Creates a zip file with manifest.json at the root
+ * Chrome Web Store packaging script
+ * Creates a zip file optimized for Chrome Web Store submission
+ * 
+ * Usage: node package-for-chrome-store.js
+ * 
+ * This script:
+ * 1. Runs a clean build (no obfuscation)
+ * 2. Creates a zip with manifest.json at the root
+ * 3. Excludes unnecessary files
  */
 
-const fs = require('fs');
-const path = require('path');
 const { execSync } = require('child_process');
+const path = require('path');
 
-const buildDir = path.join(__dirname, 'build');
-const distDir = path.join(__dirname, 'dist');
-const zipName = 'cognito-ai-extension-chrome-store.zip';
-const zipPath = path.join(distDir, zipName);
+console.log('📦 Packaging for Chrome Web Store...\n');
 
-// Check if build directory exists
-if (!fs.existsSync(buildDir)) {
-  console.error('❌ Build directory does not exist. Please run build.js first.');
+// Run clean build first
+console.log('Step 1: Running clean build...');
+try {
+  execSync('node build.js --chrome-store', { stdio: 'inherit', cwd: __dirname });
+  console.log('\n✅ Build complete!');
+  console.log('\n📦 Chrome Store package ready: dist/cognito-ai-extension-chrome-store.zip');
+  console.log('\n✨ Next steps:');
+  console.log('   1. Go to https://chrome.google.com/webstore/devconsole');
+  console.log('   2. Click "New Item" or select your existing item');
+  console.log('   3. Upload the zip file from dist/ folder');
+  console.log('   4. Fill in store listing details');
+} catch (error) {
+  console.error('\n❌ Build failed:', error.message);
   process.exit(1);
 }
-
-// Check if manifest.json exists in build directory
-const manifestPath = path.join(buildDir, 'manifest.json');
-if (!fs.existsSync(manifestPath)) {
-  console.error('❌ manifest.json not found in build directory.');
-  process.exit(1);
-}
-
-console.log('📦 Packaging extension for Chrome Web Store...');
-
-// Ensure dist directory exists
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir);
-}
-
-// Remove old zip if it exists
-if (fs.existsSync(zipPath)) {
-  fs.unlinkSync(zipPath);
-  console.log('🗑️  Removed old zip file');
-}
-
-// Create zip from build directory contents (not the directory itself)
-// This ensures manifest.json is at the root of the zip
-process.chdir(buildDir);
-execSync(`zip -r "${zipPath}" . -x "*.DS_Store" "*.git*"`, { stdio: 'inherit' });
-
-console.log('✅ Package created successfully!');
-console.log(`📦 Location: ${zipPath}`);
-console.log('\n📋 Package contents:');
-execSync(`unzip -l "${zipPath}" | head -15`, { stdio: 'inherit' });
-console.log('\n✨ Ready for Chrome Web Store submission!');
-
