@@ -1,34 +1,33 @@
-// Popup script for Stickr
+// Popup script for Cognito AI
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Load and display statistics
     loadStats();
     
+    // Check permissions and content script status first
+    await checkPermissionsAndStatus();
+    
     // Toggle sidebar button
     document.getElementById('toggle-sidebar').addEventListener('click', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // Check if we're on a supported site
-      const url = tab.url.toLowerCase();
-      const isSupported = url.includes('powerbi.com') || 
-                          url.includes('tableau.com') || 
-                          url.includes('grafana') || // Matches grafana.com, grafana.org, grafana.net, etc.
-                          url.includes('localhost:3000') ||
-                          url.includes('credit-intelligence.elimentary.com');
-      
-      if (isSupported) {
-        chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
-        window.close();
-      } else {
-        alert('Please navigate to a supported dashboard site (Power BI, Tableau, Grafana)');
+      // Check if content script is running
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'ping' });
+        if (response && response.status === 'ready') {
+          chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
+          window.close();
+        } else {
+          showPermissionInstructions();
+        }
+      } catch (error) {
+        // Content script not running - show permission instructions
+        showPermissionInstructions();
       }
     });
     
     // Export data button
     document.getElementById('export-data').addEventListener('click', exportComments);
-    
-    // Check if extension is active on current page
-    checkStatus();
   });
   
   async function loadStats() {
@@ -44,23 +43,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('page-notes').textContent = pageNotes;
   }
   
-  async function checkStatus() {
+  async function checkPermissionsAndStatus() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
+    const statusContainer = document.querySelector('.status');
     
-    const url = tab.url ? tab.url.toLowerCase() : '';
-    const isSupported = url.includes('powerbi.com') || 
-                        url.includes('tableau.com') || 
-                        url.includes('grafana') || // Matches grafana.com, grafana.org, grafana.net, etc.
-                        url.includes('localhost:3000'); // Local Grafana instances
-    
-    if (isSupported) {
-      statusDot.classList.remove('inactive');
-      statusText.textContent = 'Extension Active';
-    } else {
+    // Check if we can access the tab
+    if (!tab || !tab.url) {
       statusDot.classList.add('inactive');
-      statusText.textContent = 'Not on dashboard page';
+      statusText.textContent = 'Cannot access page';
+      return;
+    }
+    
+    // Check if it's a special page (chrome://, chrome-extension://, etc.)
+    const url = tab.url;
+    if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || 
+        url.startsWith('edge://') || url.startsWith('about:')) {
+      statusDot.classList.add('inactive');
+      statusText.textContent = 'Not available on this page';
+      return;
+    }
+    
+    // Try to ping the content script
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: 'ping' });
+      if (response && response.status === 'ready') {
+        statusDot.classList.remove('inactive');
+        statusText.textContent = 'Extension Active';
+        hidePermissionInstructions();
+      } else {
+        throw new Error('No response');
+      }
+    } catch (error) {
+      // Content script not running - check permissions
+      statusDot.classList.add('inactive');
+      statusText.textContent = 'Extension not active';
+      showPermissionInstructions();
+    }
+  }
+  
+  function showPermissionInstructions() {
+    let instructionsDiv = document.getElementById('permission-instructions');
+    if (!instructionsDiv) {
+      instructionsDiv = document.createElement('div');
+      instructionsDiv.id = 'permission-instructions';
+      instructionsDiv.className = 'permission-instructions';
+      instructionsDiv.innerHTML = `
+        <div class="permission-content">
+          <h3>🔒 Enable Extension Permissions</h3>
+          <p>The extension needs permission to run on this page.</p>
+          <ol>
+            <li>Click the extension icon in your browser toolbar</li>
+            <li>Click "Always allow on this site" or "Allow"</li>
+            <li>Refresh this page</li>
+          </ol>
+          <p><strong>Alternative:</strong> Go to <code>chrome://extensions</code>, find "Cognito AI", and ensure "Allow access to file URLs" is enabled if needed.</p>
+          <button class="btn btn-primary" id="refresh-page" style="margin-top: 12px; width: 100%;">Refresh Page</button>
+        </div>
+      `;
+      
+      const statusContainer = document.querySelector('.status');
+      statusContainer.insertAdjacentElement('afterend', instructionsDiv);
+      
+      // Add refresh button handler
+      document.getElementById('refresh-page').addEventListener('click', async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        chrome.tabs.reload(tab.id);
+        window.close();
+      });
+    }
+    instructionsDiv.style.display = 'block';
+  }
+  
+  function hidePermissionInstructions() {
+    const instructionsDiv = document.getElementById('permission-instructions');
+    if (instructionsDiv) {
+      instructionsDiv.style.display = 'none';
     }
   }
   

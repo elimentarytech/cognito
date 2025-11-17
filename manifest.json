@@ -1,39 +1,23 @@
 {
     "manifest_version": 3,
     "name": "Cognito AI",
-    "version": "1.0.0",
-    "description": "Super charge your static dashboards with context, knowledge and Intelligence",
+    "version": "1.0.1",
+    "description": "Cognito is the context-sharing enhancement tool that eliminates the gap between your data and the story behind it. Add comments, notes, and annotations to any webpage. Features include: comment counts, sidebar for managing comments, bubble pins on page elements, and support for all web pages",
+    "homepage_url": "https://cognito.elimentary.com",
     "permissions": [
       "storage",
       "activeTab",
       "tabs"
     ],
     "host_permissions": [
-      "https://app.powerbi.com/*",
-      "https://*.powerbi.com/*",
-      "https://*.grafana.com/*",
-      "https://*.grafana.net/*",
-      "http://localhost:3000/*",
-      "https://play.grafana.org/*",
-      "https://*.supabase.co/*",
-      "https://*.atlassian.net/*",
-      "https://api.openai.com/*",
-      "https://api.anthropic.com/*",
-      "https://generativelanguage.googleapis.com/*"
+      "<all_urls>"
     ],
     "background": {
       "service_worker": "background.js"
     },
     "content_scripts": [
       {
-        "matches": [
-          "https://app.powerbi.com/*",
-          "https://*.powerbi.com/*",
-          "https://*.grafana.com/*",
-          "https://*.grafana.net/*",
-          "http://localhost:3000/*",
-          "https://play.grafana.org/*"
-        ],
+        "matches": ["<all_urls>"],
         "js": ["html2canvas.min.js", "database.js", "integrations.js", "content.js"],
         "css": ["styles.css"],
         "run_at": "document_idle"

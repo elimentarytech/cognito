@@ -1,5 +1,5 @@
 // Background service worker for Cognito
-console.log('🚀 Cognito background service worker starting...');
+console.log('🚀 Cognito AI background service worker starting...');
 
 // Listen for installation
 chrome.runtime.onInstalled.addListener((details) => {

@@ -143,7 +143,10 @@ Cognito is the context-sharing enhancement tool that eliminates the gap between 
      relativeX REAL,
      relativeY REAL,
      jiraTicket JSONB,
-     filterState JSONB
+     filterState JSONB,
+     targetId TEXT,      
+     targetPath TEXT
+     
    );
    ```
 
